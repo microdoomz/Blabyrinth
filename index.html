@@ -17,9 +17,10 @@
         <input type="text" id="friend-code" placeholder="Friend's connection code">
         <button onclick="startConnection()">Connect</button>
         <div id="signaling-box">
-            <p>Your Offer: <span id="offer-output"></span> <button id="copy-offer" style="display:none;" onclick="copyText('offer-output')">Copy</button></p>
+            <p id="role-info">Your role will appear here after connecting.</p>
+            <p>Your Offer/Answer: <span id="offer-output"></span> <button id="copy-offer" style="display:none;" onclick="copyText('offer-output')">Copy</button></p>
             <p>Your ICE Candidate: <span id="ice-output"></span> <button id="copy-ice" style="display:none;" onclick="copyText('ice-output')">Copy</button></p>
-            <p>Paste your friend's offer: <input type="text" id="friend-offer" placeholder="Friend's offer"></p>
+            <p>Paste your friend's Offer (if you're not the initiator) or Answer (if you are): <input type="text" id="friend-offer" placeholder="Friend's offer/answer"></p>
             <p>Paste your friend's ICE: <input type="text" id="friend-ice" placeholder="Friend's ICE"></p>
             <button onclick="completeConnection()">Finish Connection</button>
         </div>
