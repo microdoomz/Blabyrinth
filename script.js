@@ -44,7 +44,8 @@ function setMyCode() {
     peer = new Peer(myConnectionCode, {
         host: '0.peerjs.com', // Free PeerJS signaling server
         port: 443,
-        path: '/'
+        path: '/',
+        debug: 2 // Enable debug logs for troubleshooting
     });
 
     peer.on('open', () => {
@@ -52,8 +53,8 @@ function setMyCode() {
     });
 
     peer.on('error', (err) => {
-        alert("PeerJS error: " + err);
-        resetConnection();
+        status.textContent = "PeerJS error: " + err;
+        console.error("PeerJS error:", err);
     });
 
     // Handle incoming connections
@@ -63,7 +64,7 @@ function setMyCode() {
     });
 }
 
-// Connect to your friend's ID
+// Connect to your friend's ID with retry logic
 function connectToFriend() {
     if (!myConnectionCode) {
         alert("Please set your connection code first!");
@@ -75,17 +76,33 @@ function connectToFriend() {
         return;
     }
 
-    // Connect to the friend's ID
+    status.textContent = "Attempting to connect to " + friendCode + "...";
+    attemptConnection(friendCode, 3, 2000); // Retry 3 times, 2-second delay
+}
+
+// Retry connection with delay
+function attemptConnection(friendCode, retries, delay) {
+    if (retries <= 0) {
+        status.textContent = "Failed to connect to " + friendCode + ". Please ensure they are online and try again.";
+        return;
+    }
+
     conn = peer.connect(friendCode);
-    setupConnection();
+    conn.on('open', () => {
+        setupConnection();
+    });
+
+    conn.on('error', (err) => {
+        status.textContent = "Connection attempt failed. Retrying... (" + retries + " attempts left)";
+        setTimeout(() => {
+            attemptConnection(friendCode, retries - 1, delay);
+        }, delay);
+    });
 }
 
 // Set up the connection for sending/receiving messages
 function setupConnection() {
-    conn.on('open', () => {
-        status.textContent = "Connected! Start chatting.";
-    });
-
+    status.textContent = "Connected! Start chatting.";
     conn.on('data', (data) => {
         displayMessage(data);
     });
@@ -96,7 +113,7 @@ function setupConnection() {
     });
 
     conn.on('error', (err) => {
-        alert("Connection error: " + err);
+        status.textContent = "Connection error: " + err;
     });
 }
 
