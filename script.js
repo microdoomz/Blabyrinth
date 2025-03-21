@@ -17,6 +17,35 @@ const copyOfferBtn = document.getElementById('copy-offer');
 const copyIceBtn = document.getElementById('copy-ice');
 const roleInfo = document.getElementById('role-info');
 
+// Reset UI and connection on page load/refresh
+window.onload = () => {
+    resetConnection();
+};
+
+// Reset connection state
+function resetConnection() {
+    if (peer) {
+        peer.close();
+    }
+    peer = null;
+    dataChannel = null;
+    myConnectionCode = '';
+    isInitiator = false;
+    myCodeDisplay.textContent = '';
+    myCodeInput.disabled = false;
+    myCodeInput.value = '';
+    friendCodeInput.value = '';
+    offerOutput.textContent = '';
+    iceOutput.textContent = '';
+    friendOfferInput.value = '';
+    friendIceInput.value = '';
+    copyOfferBtn.style.display = 'none';
+    copyIceBtn.style.display = 'none';
+    roleInfo.textContent = 'Your role will appear here after connecting.';
+    status.textContent = '';
+    chatBox.innerHTML = '';
+}
+
 // Set your custom connection code
 function setMyCode() {
     myConnectionCode = myCodeInput.value.trim();
@@ -59,7 +88,8 @@ function initPeerConnection() {
             .then(() => {
                 offerOutput.textContent = JSON.stringify(peer.localDescription);
                 copyOfferBtn.style.display = 'inline';
-            });
+            })
+            .catch(err => alert("Error creating offer: " + err));
     }
 }
 
@@ -93,14 +123,27 @@ function completeConnection() {
         return;
     }
 
+    if (!peer) {
+        alert("Connection not initialized. Please click 'Connect' again.");
+        return;
+    }
+
     if (isInitiator) {
         // Initiator sets the answer from the responder
-        peer.setRemoteDescription(JSON.parse(friendOffer))
+        if (peer.signalingState !== 'have-local-offer') {
+            alert("Invalid state: Expected 'have-local-offer', got " + peer.signalingState);
+            return;
+        }
+        peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(friendOffer)))
             .then(() => peer.addIceCandidate(JSON.parse(friendIce)))
-            .catch(err => alert("Error: " + err));
+            .catch(err => alert("Error setting answer: " + err));
     } else {
         // Responder sets the offer, creates an answer, and adds ICE
-        peer.setRemoteDescription(JSON.parse(friendOffer))
+        if (peer.signalingState !== 'stable') {
+            alert("Invalid state: Expected 'stable', got " + peer.signalingState);
+            return;
+        }
+        peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(friendOffer)))
             .then(() => peer.createAnswer())
             .then(answer => peer.setLocalDescription(answer))
             .then(() => {
@@ -109,7 +152,7 @@ function completeConnection() {
                 roleInfo.textContent = "Send this Answer back to your friend.";
             })
             .then(() => peer.addIceCandidate(JSON.parse(friendIce)))
-            .catch(err => alert("Error: " + err));
+            .catch(err => alert("Error setting offer/answer: " + err));
     }
 }
 
