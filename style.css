@@ -21,7 +21,7 @@ body {
     text-align: left;
 }
 
-#message-input, #friend-code {
+#message-input, #friend-code, #my-code-input, #friend-offer, #friend-ice {
     width: 60%;
     padding: 5px;
     margin: 5px 0;
@@ -43,4 +43,17 @@ button {
 
 #my-code {
     font-weight: bold;
+}
+
+#signaling-box {
+    margin: 20px 0;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background-color: #fafafa;
+}
+
+#offer-output, #ice-output {
+    word-wrap: break-word;
+    max-width: 80%;
+    display: inline-block;
 }
