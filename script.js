@@ -1,6 +1,7 @@
 let peer;
 let dataChannel;
 let myConnectionCode = '';
+let isInitiator = false;
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
@@ -14,6 +15,7 @@ const friendOfferInput = document.getElementById('friend-offer');
 const friendIceInput = document.getElementById('friend-ice');
 const copyOfferBtn = document.getElementById('copy-offer');
 const copyIceBtn = document.getElementById('copy-ice');
+const roleInfo = document.getElementById('role-info');
 
 // Set your custom connection code
 function setMyCode() {
@@ -23,11 +25,11 @@ function setMyCode() {
         return;
     }
     myCodeDisplay.textContent = myConnectionCode;
-    myCodeInput.disabled = true; // Prevent changing after setting
+    myCodeInput.disabled = true;
 }
 
 // Initialize WebRTC Peer Connection
-function initPeerConnection(isInitiator) {
+function initPeerConnection() {
     peer = new RTCPeerConnection();
 
     if (isInitiator) {
@@ -73,34 +75,38 @@ function startConnection() {
         return;
     }
 
-    const isInitiator = myConnectionCode < friendCode;
-    initPeerConnection(isInitiator);
+    isInitiator = myConnectionCode < friendCode;
+    roleInfo.textContent = isInitiator 
+        ? "You are the initiator. Share your Offer and ICE with your friend."
+        : "You are the responder. Wait for your friend's Offer and ICE.";
+    initPeerConnection();
     status.textContent = "Waiting for signaling details...";
 }
 
-// Complete the connection with friend's offer/ICE
+// Complete the connection with friend's offer/answer and ICE
 function completeConnection() {
     const friendOffer = friendOfferInput.value.trim();
     const friendIce = friendIceInput.value.trim();
 
     if (!friendOffer || !friendIce) {
-        alert("Please paste both your friend's offer and ICE candidate!");
+        alert("Please paste both your friend's offer/answer and ICE candidate!");
         return;
     }
 
-    if (peer.localDescription.type === 'offer') {
-        // Initiator waits for answer
+    if (isInitiator) {
+        // Initiator sets the answer from the responder
         peer.setRemoteDescription(JSON.parse(friendOffer))
             .then(() => peer.addIceCandidate(JSON.parse(friendIce)))
             .catch(err => alert("Error: " + err));
     } else {
-        // Non-initiator sets offer and responds with answer
+        // Responder sets the offer, creates an answer, and adds ICE
         peer.setRemoteDescription(JSON.parse(friendOffer))
             .then(() => peer.createAnswer())
             .then(answer => peer.setLocalDescription(answer))
             .then(() => {
                 offerOutput.textContent = JSON.stringify(peer.localDescription);
                 copyOfferBtn.style.display = 'inline';
+                roleInfo.textContent = "Send this Answer back to your friend.";
             })
             .then(() => peer.addIceCandidate(JSON.parse(friendIce)))
             .catch(err => alert("Error: " + err));
