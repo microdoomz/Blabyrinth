@@ -9,10 +9,20 @@
 <body>
     <div class="container">
         <h1>Simple P2P Chat</h1>
-        <p>Your connection code: <span id="my-code"></span>. Share it with your friend!</p>
+        <p>Set your connection code:</p>
+        <input type="text" id="my-code-input" placeholder="Your custom code">
+        <button onclick="setMyCode()">Set Code</button>
+        <p>Your connection code: <span id="my-code"></span></p>
         <p>Enter your friend's code below to connect:</p>
         <input type="text" id="friend-code" placeholder="Friend's connection code">
         <button onclick="startConnection()">Connect</button>
+        <div id="signaling-box">
+            <p>Your Offer: <span id="offer-output"></span> <button id="copy-offer" style="display:none;" onclick="copyText('offer-output')">Copy</button></p>
+            <p>Your ICE Candidate: <span id="ice-output"></span> <button id="copy-ice" style="display:none;" onclick="copyText('ice-output')">Copy</button></p>
+            <p>Paste your friend's offer: <input type="text" id="friend-offer" placeholder="Friend's offer"></p>
+            <p>Paste your friend's ICE: <input type="text" id="friend-ice" placeholder="Friend's ICE"></p>
+            <button onclick="completeConnection()">Finish Connection</button>
+        </div>
         <div id="chat-box"></div>
         <input type="text" id="message-input" placeholder="Type a message...">
         <input type="file" id="file-input" accept="image/*,video/*">
