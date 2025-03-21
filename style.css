@@ -21,20 +21,26 @@ body {
     text-align: left;
 }
 
-#message-input {
+#message-input, #friend-code {
     width: 60%;
     padding: 5px;
+    margin: 5px 0;
 }
 
 button {
     padding: 5px 10px;
+    margin: 5px;
 }
 
 #file-input {
     margin: 10px 0;
 }
 
-#status {
+#status, #my-code {
     color: #666;
     margin-top: 10px;
+}
+
+#my-code {
+    font-weight: bold;
 }
