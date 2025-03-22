@@ -168,14 +168,16 @@ function displayMessage(data, type) {
         const contentSpan = document.createElement('span');
         contentSpan.textContent = data;
         messageDiv.appendChild(contentSpan);
-    } else if (data.type && data.content) {
+    } else if (data && data.type && data.content) {
         const nameSpan = document.createElement('span');
         nameSpan.classList.add('name');
         nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
         messageDiv.appendChild(nameSpan);
 
         const element = data.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
-        const blob = new Blob([new Uint8Array(data.content)], { type: data.type });
+        // Ensure content is an ArrayBuffer or convert it
+        const contentArray = data.content instanceof ArrayBuffer ? new Uint8Array(data.content) : new Uint8Array(data.content);
+        const blob = new Blob([contentArray], { type: data.type });
         element.src = URL.createObjectURL(blob);
         if (element.tagName === 'VIDEO') {
             element.controls = true;
@@ -218,7 +220,7 @@ function sendMessage() {
             const arrayBuffer = reader.result;
             const message = {
                 type: file.type,
-                content: Array.from(new Uint8Array(arrayBuffer))
+                content: arrayBuffer // Send as ArrayBuffer directly
             };
             conn.send(message);
             displayMessage(message, 'sender');
