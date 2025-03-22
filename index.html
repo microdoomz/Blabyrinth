@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple P2P Chat</title>
+    <title>Simple IPFS Chat</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Include PeerJS from CDN -->
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Include IPFS from CDN -->
+    <script src="https://unpkg.com/ipfs@0.66.0/dist/index.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Simple P2P Chat</h1>
-        <p>Set your connection code:</p>
+        <h1>Simple IPFS Chat</h1>
+        <p class="label">Set your connection code:</p>
         <input type="text" id="my-code-input" placeholder="Your custom code">
         <button onclick="setMyCode()">Set Code</button>
-        <p>Your connection code: <span id="my-code"></span></p>
-        <p>Enter your friend's code to connect:</p>
-        <input type="text" id="friend-code" placeholder="Friend's connection code">
+        <p class="label">Your connection code: <span id="my-code"></span></p>
+        <p class="label">Your IPFS Peer ID: <span id="peer-id"></span></p>
+        <p class="label">Enter your friend's IPFS Peer ID to connect:</p>
+        <input type="text" id="friend-peer-id" placeholder="Friend's IPFS Peer ID">
         <button onclick="connectToFriend()">Connect</button>
         <div id="chat-box"></div>
+        <div id="typing-indicator"></div>
         <input type="text" id="message-input" placeholder="Type a message...">
         <input type="file" id="file-input" accept="image/*,video/*">
         <button onclick="sendMessage()">Send</button>
