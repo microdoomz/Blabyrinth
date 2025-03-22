@@ -88,7 +88,7 @@ h1 {
     text-align: left;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
     white-space: normal;
-    max-height: calc(100vh - 400px); /* Further reduced to fit all elements */
+    max-height: calc(100vh - 450px); /* Further reduced to ensure input area visibility */
 }
 
 #chat-box .message {
@@ -329,6 +329,9 @@ button:disabled {
     max-width: 570px;
     box-sizing: border-box;
     flex-wrap: nowrap;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
 }
 
 #message-input {
@@ -509,7 +512,7 @@ button:disabled {
     }
 
     #chat-box {
-        max-height: calc(100vh - 420px); /* Further reduced for mobile */
+        max-height: calc(100vh - 480px); /* Further reduced for mobile to ensure input area visibility */
     }
 }
 
