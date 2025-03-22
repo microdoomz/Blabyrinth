@@ -10,6 +10,7 @@ const myCodeInput = document.getElementById('my-code-input');
 const peerIdDisplay = document.getElementById('peer-id');
 const friendPeerIdInput = document.getElementById('friend-peer-id');
 const typingIndicator = document.getElementById('typing-indicator');
+const connectBtn = document.getElementById('connect-btn');
 
 // Reset UI on page load
 window.onload = () => {
@@ -19,7 +20,7 @@ window.onload = () => {
 // Reset connection state
 function resetConnection() {
     if (node) {
-        node.stop();
+        node.stop().catch(err => console.error("Error stopping IPFS node:", err));
     }
     node = null;
     myConnectionCode = '';
@@ -31,6 +32,7 @@ function resetConnection() {
     status.textContent = '';
     chatBox.innerHTML = '';
     typingIndicator.textContent = '';
+    connectBtn.disabled = true;
 }
 
 // Set your custom connection code and initialize IPFS
@@ -61,12 +63,14 @@ async function setMyCode() {
         const peerInfo = await node.id();
         peerIdDisplay.textContent = peerInfo.id;
         status.textContent = "IPFS node started. Share your Peer ID with your friend!";
+        connectBtn.disabled = false; // Enable the Connect button once the node is ready
     } catch (err) {
         status.textContent = "Failed to start IPFS node: " + err;
+        connectBtn.disabled = true;
     }
 }
 
-// Connect to your friend's IPFS Peer ID
+// Connect to your friend's IPFS Peer ID with retry logic
 async function connectToFriend() {
     if (!myConnectionCode || !node) {
         alert("Please set your connection code first!");
@@ -78,8 +82,17 @@ async function connectToFriend() {
         return;
     }
 
-    // Try to connect to the friend's peer
+    // Try to connect to the friend's peer with retries
     status.textContent = "Connecting to friend...";
+    await attemptConnection(friendPeerId, 3, 3000); // Retry 3 times, 3-second delay
+}
+
+async function attemptConnection(friendPeerId, retries, delay) {
+    if (retries <= 0) {
+        status.textContent = "Failed to connect to friend. Please ensure they are online and try again.";
+        return;
+    }
+
     try {
         await node.swarm.connect(`/p2p/${friendPeerId}`);
         status.textContent = "Connected to friend! Subscribing to chat channel...";
@@ -105,7 +118,10 @@ async function connectToFriend() {
         });
         status.textContent = "Connected! Start chatting.";
     } catch (err) {
-        status.textContent = "Failed to connect: " + err;
+        status.textContent = `Connection attempt failed. Retrying... (${retries} attempts left)`;
+        setTimeout(async () => {
+            await attemptConnection(friendPeerId, retries - 1, delay);
+        }, delay);
     }
 }
 
