@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
     <!-- Include PeerJS from CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Include IPFS from CDN for media sharing -->
+    <script src="https://unpkg.com/ipfs@0.66.0/dist/index.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -20,11 +22,6 @@
         <input type="text" id="friend-code" placeholder="Friend's connection code">
         <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
         <div id="chat-box"></div>
-        <div id="typing-indicator" class="typing-indicator">
-            <div class="dot"></div>
-            <div class="dot"></div>
-            <div class="dot"></div>
-        </div>
         <input type="text" id="message-input" placeholder="Type a message...">
         <input type="file" id="file-input" accept="image/*,video/*">
         <button onclick="sendMessage()">Send</button>
