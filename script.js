@@ -4,6 +4,7 @@ let myConnectionCode = '';
 let friendCode = '';
 let typingTimeout;
 let typingMessageElement = null;
+let replyingToMessage = null;
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
@@ -17,6 +18,7 @@ const disconnectBtn = document.getElementById('disconnect-btn');
 const mediaOverlay = document.getElementById('media-overlay');
 const mediaOverlayContent = document.getElementById('media-overlay-content');
 const downloadBtn = document.getElementById('download-btn');
+const replyOverlay = document.getElementById('reply-overlay');
 
 // List of PeerJS servers for fallback
 const peerJsServers = [
@@ -72,6 +74,7 @@ function resetConnection() {
     localStorage.removeItem('myConnectionCode');
     localStorage.removeItem('friendCode');
     clearFilePreview();
+    replyingToMessage = null;
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -198,6 +201,9 @@ function setupConnection() {
             } else if (data.startsWith('media:')) {
                 const [_, mediaType, base64Data, fileName] = data.split(':');
                 displayMedia(mediaType, base64Data, fileName, 'receiver');
+            } else if (data.startsWith('reply:')) {
+                const [_, replyTo, message] = data.split(':', 3);
+                displayMessage(message, 'receiver', replyTo);
             } else {
                 displayMessage(data, 'receiver');
             }
@@ -219,14 +225,22 @@ function setupConnection() {
 }
 
 // Display incoming or outgoing text messages
-function displayMessage(text, type) {
+function displayMessage(text, type, replyTo = null) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
+    messageDiv.dataset.message = text; // Store message for reply
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('name');
     nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
     messageDiv.appendChild(nameSpan);
+
+    if (replyTo) {
+        const repliedMessage = document.createElement('span');
+        repliedMessage.classList.add('replied-message');
+        repliedMessage.textContent = replyTo;
+        messageDiv.appendChild(repliedMessage);
+    }
 
     const contentSpan = document.createElement('span');
     contentSpan.classList.add('content');
@@ -234,7 +248,8 @@ function displayMessage(text, type) {
     messageDiv.appendChild(contentSpan);
 
     chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight; // Ensure scrolling works on mobile
+    scrollToBottom();
+    addSwipeAndLongPress(messageDiv);
 }
 
 // Show typing indicator inside chat box
@@ -249,7 +264,7 @@ function showTypingIndicator() {
         <span class="dot"></span>
     `;
     chatBox.appendChild(typingMessageElement);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    scrollToBottom();
 }
 
 // Hide typing indicator
@@ -258,7 +273,7 @@ function hideTypingIndicator() {
         typingMessageElement.remove();
         typingMessageElement = null;
     }
-    chatBox.scrollTop = chatBox.scrollHeight;
+    scrollToBottom();
 }
 
 // Display media from Base64 data
@@ -326,7 +341,7 @@ function displayMedia(mediaType, base64Data, fileName, type) {
 
     messageDiv.appendChild(container);
     chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    scrollToBottom();
 }
 
 // Open media in full-screen overlay
@@ -395,6 +410,12 @@ function clearFilePreview() {
     filePreview.innerHTML = '';
 }
 
+// Scroll to bottom of chat box
+function scrollToBottom() {
+    chatBox.scrollTop = chatBox.scrollHeight;
+    chatBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
 // Send typing event
 function sendTypingEvent(isTyping) {
     if (!conn || !conn.open) return;
@@ -415,8 +436,15 @@ async function sendMessage() {
     sendTypingEvent(false);
 
     if (text) {
-        conn.send(text);
-        displayMessage(text, 'sender');
+        if (replyingToMessage) {
+            const replyTo = replyingToMessage.dataset.message;
+            conn.send(`reply:${replyTo}:${text}`);
+            displayMessage(text, 'sender', replyTo);
+            replyingToMessage = null;
+        } else {
+            conn.send(text);
+            displayMessage(text, 'sender');
+        }
         messageInput.value = '';
     }
     if (file) {
@@ -460,3 +488,53 @@ messageInput.addEventListener('keypress', (event) => {
         sendMessage();
     }
 });
+
+// Swipe and long-press for reply
+function addSwipeAndLongPress(messageDiv) {
+    let startX = 0;
+    let isSwiping = false;
+
+    messageDiv.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isSwiping = true;
+    });
+
+    messageDiv.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        const currentX = e.touches[0].clientX;
+        const diffX = currentX - startX;
+        if (diffX > 50) {
+            messageDiv.style.transform = 'translateX(50px)';
+        } else {
+            messageDiv.style.transform = 'translateX(0)';
+        }
+    });
+
+    messageDiv.addEventListener('touchend', (e) => {
+        const currentX = e.changedTouches[0].clientX;
+        const diffX = currentX - startX;
+        if (diffX > 50) {
+            showReplyOverlay(messageDiv);
+        }
+        messageDiv.style.transform = 'translateX(0)';
+        isSwiping = false;
+    });
+
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showReplyOverlay(messageDiv);
+    });
+}
+
+function showReplyOverlay(messageDiv) {
+    replyingToMessage = messageDiv;
+    const rect = messageDiv.getBoundingClientRect();
+    replyOverlay.style.display = 'block';
+    replyOverlay.style.top = `${rect.top + window.scrollY}px`;
+    replyOverlay.style.left = `${rect.left + rect.width - 60}px`;
+}
+
+function initiateReply() {
+    replyOverlay.style.display = 'none';
+    messageInput.focus();
+}
