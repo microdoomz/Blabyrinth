@@ -17,12 +17,12 @@
         <div class="code-inputs">
             <div class="code-input">
                 <p class="label">Set your connection code:</p>
-                <input type="text" id="my-code-input" placeholder="Your custom code">
+                <input type="text" id="my-code-input" placeholder="Your custom code" onkeypress="if(event.key === 'Enter') setMyCode()">
                 <button onclick="setMyCode()">Set Code</button>
             </div>
             <div class="code-input">
                 <p class="label">Enter your friend's code to connect:</p>
-                <input type="text" id="friend-code" placeholder="Friend's connection code">
+                <input type="text" id="friend-code" placeholder="Friend's connection code" onkeypress="if(event.key === 'Enter') connectToFriend()">
                 <div class="button-group">
                     <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
                     <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
@@ -49,7 +49,8 @@
     </div>
     <!-- Reply action overlay -->
     <div id="reply-overlay" class="reply-overlay">
-        <button onclick="initiateReply()">Reply</button>
+        <div id="reply-preview" class="reply-preview"></div>
+        <button onclick="initiateReply()" class="reply-btn">Reply</button>
         <button onclick="cancelReply()" class="cancel-reply">×</button>
     </div>
     <script src="script.js"></script>
