@@ -18,7 +18,7 @@
         <p class="label">Your IPFS Peer ID: <span id="peer-id"></span></p>
         <p class="label">Enter your friend's IPFS Peer ID to connect:</p>
         <input type="text" id="friend-peer-id" placeholder="Friend's IPFS Peer ID">
-        <button onclick="connectToFriend()">Connect</button>
+        <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
         <div id="chat-box"></div>
         <div id="typing-indicator"></div>
         <input type="text" id="message-input" placeholder="Type a message...">
