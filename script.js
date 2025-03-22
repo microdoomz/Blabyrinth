@@ -1,8 +1,10 @@
 let peer;
 let conn;
+let ipfsNode;
 let myConnectionCode = '';
 let friendCode = '';
 let typingTimeout;
+let typingMessageElement = null;
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
@@ -10,12 +12,20 @@ const status = document.getElementById('status');
 const myCodeDisplay = document.getElementById('my-code');
 const myCodeInput = document.getElementById('my-code-input');
 const friendCodeInput = document.getElementById('friend-code');
-const typingIndicator = document.getElementById('typing-indicator');
 const connectBtn = document.getElementById('connect-btn');
+
+// List of PeerJS servers for fallback
+const peerJsServers = [
+    { host: '0.peerjs.com', port: 443, path: '/' },
+    { host: 'peerjs.herokuapp.com', port: 443, path: '/' },
+    { host: 'peerjs-server-staging.herokuapp.com', port: 443, path: '/' }
+];
+let currentServerIndex = 0;
 
 // Reset UI on page load
 window.onload = () => {
     resetConnection();
+    initializeIpfs();
 };
 
 // Reset connection state
@@ -35,11 +45,35 @@ function resetConnection() {
     status.classList.remove('connected');
     status.classList.add('disconnected');
     chatBox.innerHTML = '';
-    typingIndicator.classList.remove('active');
+    if (typingMessageElement) {
+        typingMessageElement.remove();
+        typingMessageElement = null;
+    }
     connectBtn.disabled = true;
 }
 
-// Set your custom connection code and initialize PeerJS
+// Initialize IPFS node for media sharing
+async function initializeIpfs() {
+    try {
+        ipfsNode = await Ipfs.create({
+            repo: 'ipfs-' + Math.random(),
+            config: {
+                Addresses: {
+                    Swarm: [
+                        '/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star',
+                        '/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star'
+                    ]
+                }
+            }
+        });
+        console.log("IPFS node initialized successfully");
+    } catch (err) {
+        console.error("Failed to initialize IPFS node:", err);
+        status.textContent = "Failed to initialize IPFS for media sharing.";
+    }
+}
+
+// Set your custom connection code and initialize PeerJS with fallback
 function setMyCode() {
     myConnectionCode = myCodeInput.value.trim();
     if (!myConnectionCode) {
@@ -49,11 +83,32 @@ function setMyCode() {
     myCodeDisplay.textContent = myConnectionCode;
     myCodeInput.disabled = true;
 
-    // Initialize PeerJS with your custom ID
+    connectToNextPeerJsServer();
+}
+
+// Connect to a PeerJS server with fallback mechanism
+function connectToNextPeerJsServer() {
+    if (currentServerIndex >= peerJsServers.length) {
+        status.textContent = "Failed to connect to any PeerJS server.";
+        status.classList.remove('connected');
+        status.classList.add('disconnected');
+        resetConnection();
+        return;
+    }
+
+    const server = peerJsServers[currentServerIndex];
+    status.textContent = `Connecting to PeerJS server: ${server.host}...`;
+    status.classList.remove('connected');
+    status.classList.add('disconnected');
+
+    if (peer) {
+        peer.destroy();
+    }
+
     peer = new Peer(myConnectionCode, {
-        host: '0.peerjs.com',
-        port: 443,
-        path: '/',
+        host: server.host,
+        port: server.port,
+        path: server.path,
         debug: 2
     });
 
@@ -65,17 +120,20 @@ function setMyCode() {
     });
 
     peer.on('error', (err) => {
-        status.textContent = "PeerJS error: " + err;
-        status.classList.remove('connected');
-        status.classList.add('disconnected');
-        console.error("PeerJS error:", err);
-        resetConnection();
+        console.error(`PeerJS error with server ${server.host}:`, err);
+        currentServerIndex++;
+        connectToNextPeerJsServer();
+    });
+
+    peer.on('disconnected', () => {
+        currentServerIndex++;
+        connectToNextPeerJsServer();
     });
 
     // Handle incoming connections
     peer.on('connection', (connection) => {
         conn = connection;
-        friendCode = conn.peer; // Set friendCode to the peer's ID
+        friendCode = conn.peer;
         setupConnection();
     });
 }
@@ -131,12 +189,17 @@ function setupConnection() {
         if (typeof data === 'string') {
             if (data.startsWith('typing:')) {
                 const isTyping = data.split(':')[1] === 'true';
-                typingIndicator.classList.toggle('active', isTyping);
+                if (isTyping) {
+                    showTypingIndicator();
+                } else {
+                    hideTypingIndicator();
+                }
+            } else if (data.startsWith('media:')) {
+                const cid = data.split('media:')[1];
+                fetchMediaFromIpfs(cid, 'receiver');
             } else {
                 displayMessage(data, 'receiver');
             }
-        } else {
-            displayMessage(data, 'receiver');
         }
     });
 
@@ -154,40 +217,105 @@ function setupConnection() {
     });
 }
 
-// Display incoming or outgoing messages/files
-function displayMessage(data, type) {
+// Display incoming or outgoing text messages
+function displayMessage(text, type) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
 
-    if (typeof data === 'string') {
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('name');
+    nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
+    messageDiv.appendChild(nameSpan);
+
+    const contentSpan = document.createElement('span');
+    contentSpan.textContent = text;
+    messageDiv.appendChild(contentSpan);
+
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Show typing indicator inside chat box
+function showTypingIndicator() {
+    if (typingMessageElement) return;
+
+    typingMessageElement = document.createElement('div');
+    typingMessageElement.classList.add('typing-message');
+    typingMessageElement.innerHTML = `
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+    `;
+    chatBox.appendChild(typingMessageElement);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Hide typing indicator
+function hideTypingIndicator() {
+    if (typingMessageElement) {
+        typingMessageElement.remove();
+        typingMessageElement = null;
+    }
+}
+
+// Upload media to IPFS and share the CID
+async function uploadMediaToIpfs(file) {
+    if (!ipfsNode) {
+        alert("IPFS node is not initialized. Cannot share media.");
+        return null;
+    }
+    try {
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        return new Promise((resolve, reject) => {
+            reader.onload = async () => {
+                const buffer = reader.result;
+                const { cid } = await ipfsNode.add(buffer);
+                resolve(cid.toString());
+            };
+            reader.onerror = reject;
+        });
+    } catch (err) {
+        console.error("Failed to upload media to IPFS:", err);
+        return null;
+    }
+}
+
+// Fetch media from IPFS using CID
+async function fetchMediaFromIpfs(cid, type) {
+    if (!ipfsNode) {
+        alert("IPFS node is not initialized. Cannot fetch media.");
+        return;
+    }
+    try {
+        const stream = ipfsNode.cat(cid);
+        const chunks = [];
+        for await (const chunk of stream) {
+            chunks.push(chunk);
+        }
+        const buffer = new Blob(chunks);
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', type);
+
         const nameSpan = document.createElement('span');
         nameSpan.classList.add('name');
         nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
         messageDiv.appendChild(nameSpan);
 
-        const contentSpan = document.createElement('span');
-        contentSpan.textContent = data;
-        messageDiv.appendChild(contentSpan);
-    } else if (data && data.type && data.content) {
-        const nameSpan = document.createElement('span');
-        nameSpan.classList.add('name');
-        nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
-        messageDiv.appendChild(nameSpan);
-
-        const element = data.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
-        // Ensure content is an ArrayBuffer or convert it
-        const contentArray = data.content instanceof ArrayBuffer ? new Uint8Array(data.content) : new Uint8Array(data.content);
-        const blob = new Blob([contentArray], { type: data.type });
-        element.src = URL.createObjectURL(blob);
+        const element = buffer.type && buffer.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
+        element.src = URL.createObjectURL(buffer);
         if (element.tagName === 'VIDEO') {
             element.controls = true;
         }
         element.style.maxWidth = '100%';
         messageDiv.appendChild(element);
-    }
 
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    } catch (err) {
+        console.error("Failed to fetch media from IPFS:", err);
+        status.textContent = "Failed to fetch media.";
+    }
 }
 
 // Send typing event
@@ -197,7 +325,7 @@ function sendTypingEvent(isTyping) {
 }
 
 // Send text or file
-function sendMessage() {
+async function sendMessage() {
     if (!conn || !conn.open) {
         alert("Not connected yet! Connect to your friend first.");
         return;
@@ -215,17 +343,13 @@ function sendMessage() {
         messageInput.value = '';
     }
     if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const arrayBuffer = reader.result;
-            const message = {
-                type: file.type,
-                content: arrayBuffer // Send as ArrayBuffer directly
-            };
-            conn.send(message);
-            displayMessage(message, 'sender');
-        };
-        reader.readAsArrayBuffer(file);
+        const cid = await uploadMediaToIpfs(file);
+        if (cid) {
+            conn.send(`media:${cid}`);
+            fetchMediaFromIpfs(cid, 'sender');
+        } else {
+            alert("Failed to upload media to IPFS.");
+        }
         fileInput.value = '';
     }
 }
