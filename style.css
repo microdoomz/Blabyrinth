@@ -86,6 +86,42 @@ h1 {
     margin-right: 5px;
 }
 
+#chat-box .typing-message {
+    margin: 10px 0;
+    padding: 10px;
+    max-width: 70%;
+    display: flex;
+    align-items: center;
+    margin-right: auto;
+}
+
+#chat-box .typing-message .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin: 0 2px;
+    background: #777;
+    border-radius: 50%;
+    animation: dot-flashing 1s infinite linear alternate;
+}
+
+#chat-box .typing-message .dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+#chat-box .typing-message .dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes dot-flashing {
+    0% {
+        background: #777;
+    }
+    50%, 100% {
+        background: #ccc;
+    }
+}
+
 #chat-box img, #chat-box video {
     max-width: 100%;
     border-radius: 10px;
@@ -136,43 +172,4 @@ button:disabled {
 #my-code {
     font-weight: bold;
     color: #ff6f61;
-}
-
-.typing-indicator {
-    display: none;
-    margin-bottom: 10px;
-    min-height: 20px;
-    text-align: left;
-    padding-left: 15px;
-}
-
-.typing-indicator.active {
-    display: block;
-}
-
-.typing-indicator .dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    margin: 0 2px;
-    background: #777;
-    border-radius: 50%;
-    animation: dot-flashing 1s infinite linear alternate;
-}
-
-.typing-indicator .dot:nth-child(2) {
-    animation-delay: 0.2s;
-}
-
-.typing-indicator .dot:nth-child(3) {
-    animation-delay: 0.4s;
-}
-
-@keyframes dot-flashing {
-    0% {
-        background: #777;
-    }
-    50%, 100% {
-        background: #ccc;
-    }
 }
