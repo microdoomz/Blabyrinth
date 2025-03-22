@@ -21,6 +21,7 @@ const mediaOverlayContent = document.getElementById('media-overlay-content');
 const downloadBtn = document.getElementById('download-btn');
 const replyPreviewArea = document.getElementById('reply-preview-area');
 const replyPreview = document.getElementById('reply-preview');
+const resizeHandle = document.getElementById('chat-box-resize-handle');
 
 // List of PeerJS servers for fallback
 const peerJsServers = [
@@ -50,6 +51,8 @@ window.onload = () => {
     }
     // Ensure reply preview area is hidden on load
     replyPreviewArea.classList.remove('active');
+    // Initialize chat box resizing
+    initChatBoxResize();
 };
 
 // Reset connection state
@@ -209,8 +212,8 @@ function setupConnection() {
                 displayMedia(mediaType, base64Data, fileName, 'receiver', messageId, parseInt(timestamp));
                 conn.send(`delivered:${messageId}`);
             } else if (data.startsWith('reply:')) {
-                const [_, replyTo, message, messageId, timestamp] = data.split(':', 5);
-                displayMessage(message, 'receiver', replyTo, messageId, parseInt(timestamp));
+                const [_, replyToData, message, messageId, timestamp, replyToId, replyToMediaType, replyToMediaSrc] = data.split(':', 8);
+                displayMessage(message, 'receiver', replyToData, messageId, parseInt(timestamp), replyToId, replyToMediaType || '', replyToMediaSrc || '');
                 conn.send(`delivered:${messageId}`);
             } else if (data.startsWith('delivered:')) {
                 const messageId = data.split(':')[1];
@@ -306,7 +309,7 @@ function updateMessageStatus(messageId, status) {
 }
 
 // Display incoming or outgoing text messages
-function displayMessage(text, type, replyTo = null, messageId = null, timestamp = null) {
+function displayMessage(text, type, replyTo = null, messageId = null, timestamp = null, replyToId = null, replyToMediaType = '', replyToMediaSrc = '') {
     if (!messageId) {
         messageId = generateMessageId();
         timestamp = Date.now();
@@ -325,7 +328,29 @@ function displayMessage(text, type, replyTo = null, messageId = null, timestamp 
     if (replyTo) {
         const repliedMessage = document.createElement('span');
         repliedMessage.classList.add('replied-message');
-        repliedMessage.textContent = replyTo;
+        if (replyToMediaType && (replyToMediaType.startsWith('image') || replyToMediaType.startsWith('video'))) {
+            if (replyToMediaType.startsWith('image')) {
+                const img = document.createElement('img');
+                img.src = replyToMediaSrc;
+                repliedMessage.appendChild(img);
+            } else if (replyToMediaType.startsWith('video')) {
+                const video = document.createElement('video');
+                video.src = replyToMediaSrc;
+                video.controls = true;
+                repliedMessage.appendChild(video);
+            }
+        } else {
+            repliedMessage.textContent = replyTo;
+        }
+        if (replyToId) {
+            repliedMessage.dataset.replyToId = replyToId;
+            repliedMessage.addEventListener('click', () => {
+                const originalMessage = chatBox.querySelector(`[data-message-id="${replyToId}"]`);
+                if (originalMessage) {
+                    originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }
         messageDiv.appendChild(repliedMessage);
     }
 
@@ -569,8 +594,11 @@ async function sendMessage() {
     if (text) {
         if (replyingToMessage) {
             const replyTo = replyingToMessage.dataset.message;
-            conn.send(`reply:${replyTo}:${text}:${messageId}:${timestamp}`);
-            displayMessage(text, 'sender', replyTo, messageId, timestamp);
+            const replyToId = replyingToMessage.dataset.messageId;
+            const replyToMediaType = replyingToMessage.dataset.mediaType || '';
+            const replyToMediaSrc = replyingToMessage.dataset.mediaSrc || '';
+            conn.send(`reply:${replyTo}:${text}:${messageId}:${timestamp}:${replyToId}:${replyToMediaType}:${replyToMediaSrc}`);
+            displayMessage(text, 'sender', replyTo, messageId, timestamp, replyToId, replyToMediaType, replyToMediaSrc);
             replyingToMessage = null;
             replyPreviewArea.classList.remove('active');
         } else {
@@ -694,4 +722,56 @@ function cancelReply() {
     replyingToMessage = null;
     replyPreviewArea.classList.remove('active');
     messageInput.blur(); // Close the keyboard if open
+}
+
+// Initialize chat box resizing
+function initChatBoxResize() {
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        startHeight = chatBox.offsetHeight;
+        document.body.style.userSelect = 'none'; // Prevent text selection while resizing
+    });
+
+    resizeHandle.addEventListener('touchstart', (e) => {
+        isResizing = true;
+        startY = e.touches[0].clientY;
+        startHeight = chatBox.offsetHeight;
+        document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const deltaY = e.clientY - startY;
+        let newHeight = startHeight + deltaY;
+        // Enforce minimum and maximum heights
+        const minHeight = 200; // Same as CSS min-height
+        const maxHeight = window.innerHeight - 200; // Same as CSS max-height
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        chatBox.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('touchmove', (e) => {
+        if (!isResizing) return;
+        const deltaY = e.touches[0].clientY - startY;
+        let newHeight = startHeight + deltaY;
+        const minHeight = 200;
+        const maxHeight = window.innerHeight - 220; // Adjust for mobile
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        chatBox.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isResizing = false;
+        document.body.style.userSelect = '';
+    });
+
+    document.addEventListener('touchend', () => {
+        isResizing = false;
+        document.body.style.userSelect = '';
+    });
 }
