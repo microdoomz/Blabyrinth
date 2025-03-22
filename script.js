@@ -280,7 +280,7 @@ function generateMessageId() {
 function formatTimestamp(timestamp) {
     const date = new Date(timestamp);
     // Convert to IST (UTC +5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
     const istDate = new Date(date.getTime() + istOffset);
     const hours = istDate.getHours() % 12 || 12;
     const minutes = istDate.getMinutes().toString().padStart(2, '0');
@@ -292,9 +292,9 @@ function formatTimestamp(timestamp) {
 function updateMessageStatus(messageId, status) {
     const messageDiv = chatBox.querySelector(`[data-message-id="${messageId}"]`);
     if (messageDiv) {
-        const statusTicks = messageDiv.querySelector('.status-ticks');
-        if (statusTicks) {
-            statusTicks.className = `status-ticks ${status}`;
+        const statusText = messageDiv.querySelector('.status-text');
+        if (statusText) {
+            statusText.className = `status-text ${status}`;
         }
         messageStatuses.set(messageId, status);
     }
@@ -336,9 +336,9 @@ function displayMessage(text, type, replyTo = null, messageId = null, timestamp 
     metaDiv.appendChild(timeSpan);
 
     if (type === 'sender') {
-        const statusTicks = document.createElement('span');
-        statusTicks.classList.add('status-ticks', 'sent');
-        metaDiv.appendChild(statusTicks);
+        const statusText = document.createElement('span');
+        statusText.classList.add('status-text', 'sent');
+        metaDiv.appendChild(statusText);
         messageStatuses.set(messageId, 'sent');
     }
 
@@ -384,6 +384,8 @@ function displayMedia(mediaType, base64Data, fileName, type, messageId = null, t
     messageDiv.classList.add('message', type);
     messageDiv.dataset.message = fileName || 'Media';
     messageDiv.dataset.messageId = messageId;
+    messageDiv.dataset.mediaType = mediaType;
+    messageDiv.dataset.mediaSrc = `data:${mediaType};base64,${base64Data}`;
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('name');
@@ -450,9 +452,9 @@ function displayMedia(mediaType, base64Data, fileName, type, messageId = null, t
     metaDiv.appendChild(timeSpan);
 
     if (type === 'sender') {
-        const statusTicks = document.createElement('span');
-        statusTicks.classList.add('status-ticks', 'sent');
-        metaDiv.appendChild(statusTicks);
+        const statusText = document.createElement('span');
+        statusText.classList.add('status-text', 'sent');
+        metaDiv.appendChild(statusText);
         messageStatuses.set(messageId, 'sent');
     }
 
@@ -565,6 +567,7 @@ async function sendMessage() {
             conn.send(`reply:${replyTo}:${text}:${messageId}:${timestamp}`);
             displayMessage(text, 'sender', replyTo, messageId, timestamp);
             replyingToMessage = null;
+            replyOverlay.style.display = 'none';
         } else {
             conn.send(`${messageId}:${timestamp}:${text}`);
             displayMessage(text, 'sender', null, messageId, timestamp);
@@ -629,8 +632,10 @@ function addSwipeAndLongPress(messageDiv) {
         const diffX = currentX - startX;
         if (diffX > 50) {
             messageDiv.style.transform = 'translateX(50px)';
+            showReplyOverlay(messageDiv, true);
         } else {
             messageDiv.style.transform = 'translateX(0)';
+            replyOverlay.style.display = 'none';
         }
     });
 
@@ -638,8 +643,9 @@ function addSwipeAndLongPress(messageDiv) {
         const currentX = e.changedTouches[0].clientX;
         const diffX = currentX - startX;
         if (diffX > 50) {
-            showReplyOverlay(messageDiv, true);
-            initiateReply();
+            // Keep the overlay visible for user to confirm or cancel
+        } else {
+            replyOverlay.style.display = 'none';
         }
         messageDiv.style.transform = 'translateX(0)';
         isSwiping = false;
@@ -657,7 +663,17 @@ function showReplyOverlay(messageDiv, isDragged) {
     replyOverlay.style.display = 'flex';
     replyOverlay.style.top = `${rect.top + window.scrollY}px`;
     replyOverlay.style.left = `${rect.left + rect.width - 80}px`;
-    replyPreview.textContent = messageDiv.dataset.message;
+
+    // Show preview (image or text)
+    replyPreview.innerHTML = '';
+    if (messageDiv.dataset.mediaType && messageDiv.dataset.mediaType.startsWith('image')) {
+        const img = document.createElement('img');
+        img.src = messageDiv.dataset.mediaSrc;
+        replyPreview.appendChild(img);
+    } else {
+        replyPreview.textContent = messageDiv.dataset.message;
+    }
+
     if (isDragged) {
         replyOverlay.classList.add('dragged');
     } else {
