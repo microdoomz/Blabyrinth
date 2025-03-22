@@ -12,6 +12,10 @@ const myCodeDisplay = document.getElementById('my-code');
 const myCodeInput = document.getElementById('my-code-input');
 const friendCodeInput = document.getElementById('friend-code');
 const connectBtn = document.getElementById('connect-btn');
+const disconnectBtn = document.getElementById('disconnect-btn');
+const mediaOverlay = document.getElementById('media-overlay');
+const mediaOverlayContent = document.getElementById('media-overlay-content');
+const downloadBtn = document.getElementById('download-btn');
 
 // List of PeerJS servers for fallback
 const peerJsServers = [
@@ -21,9 +25,24 @@ const peerJsServers = [
 ];
 let currentServerIndex = 0;
 
-// Reset UI on page load
+// Load saved connection details from localStorage
 window.onload = () => {
-    resetConnection();
+    const savedMyCode = localStorage.getItem('myConnectionCode');
+    const savedFriendCode = localStorage.getItem('friendCode');
+    if (savedMyCode) {
+        myCodeInput.value = savedMyCode;
+        myCodeInput.disabled = true;
+        myCodeDisplay.textContent = savedMyCode;
+        myConnectionCode = savedMyCode;
+        connectToNextPeerJsServer();
+    }
+    if (savedFriendCode) {
+        friendCodeInput.value = savedFriendCode;
+        friendCode = savedFriendCode;
+        if (myConnectionCode) {
+            connectToFriend();
+        }
+    }
 };
 
 // Reset connection state
@@ -48,6 +67,9 @@ function resetConnection() {
         typingMessageElement = null;
     }
     connectBtn.disabled = true;
+    disconnectBtn.disabled = true;
+    localStorage.removeItem('myConnectionCode');
+    localStorage.removeItem('friendCode');
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -59,16 +81,13 @@ function setMyCode() {
     }
     myCodeDisplay.textContent = myConnectionCode;
     myCodeInput.disabled = true;
-
+    localStorage.setItem('myConnectionCode', myConnectionCode);
     connectToNextPeerJsServer();
 }
 
 // Connect to a PeerJS server with fallback mechanism
 function connectToNextPeerJsServer() {
     if (currentServerIndex >= peerJsServers.length) {
-        status.textContent = "Failed to connect to any PeerJS server.";
-        status.classList.remove('connected');
-        status.classList.add('disconnected');
         resetConnection();
         return;
     }
@@ -94,6 +113,7 @@ function connectToNextPeerJsServer() {
         status.classList.remove('connected');
         status.classList.add('disconnected');
         connectBtn.disabled = false;
+        disconnectBtn.disabled = false;
     });
 
     peer.on('error', (err) => {
@@ -111,6 +131,7 @@ function connectToNextPeerJsServer() {
     peer.on('connection', (connection) => {
         conn = connection;
         friendCode = conn.peer;
+        localStorage.setItem('friendCode', friendCode);
         setupConnection();
     });
 }
@@ -127,6 +148,7 @@ function connectToFriend() {
         return;
     }
 
+    localStorage.setItem('friendCode', friendCode);
     status.textContent = "Attempting to connect to " + friendCode + "...";
     status.classList.remove('connected');
     status.classList.add('disconnected');
@@ -172,8 +194,8 @@ function setupConnection() {
                     hideTypingIndicator();
                 }
             } else if (data.startsWith('media:')) {
-                const [_, mediaType, base64Data] = data.split(':');
-                displayMedia(mediaType, base64Data, 'receiver');
+                const [_, mediaType, base64Data, fileName] = data.split(':');
+                displayMedia(mediaType, base64Data, fileName, 'receiver');
             } else {
                 displayMessage(data, 'receiver');
             }
@@ -236,7 +258,7 @@ function hideTypingIndicator() {
 }
 
 // Display media from Base64 data
-function displayMedia(mediaType, base64Data, type) {
+function displayMedia(mediaType, base64Data, fileName, type) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
 
@@ -245,16 +267,53 @@ function displayMedia(mediaType, base64Data, type) {
     nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
     messageDiv.appendChild(nameSpan);
 
-    const element = mediaType.startsWith('image') ? document.createElement('img') : document.createElement('video');
-    element.src = `data:${mediaType};base64,${base64Data}`;
-    if (element.tagName === 'VIDEO') {
-        element.controls = true;
+    if (mediaType.startsWith('image')) {
+        const img = document.createElement('img');
+        img.src = `data:${mediaType};base64,${base64Data}`;
+        img.onclick = () => openMediaOverlay(img.src, fileName);
+        messageDiv.appendChild(img);
+    } else if (mediaType.startsWith('video')) {
+        const video = document.createElement('video');
+        video.src = `data:${mediaType};base64,${base64Data}`;
+        video.controls = true;
+        video.onclick = () => openMediaOverlay(video.src, fileName);
+        messageDiv.appendChild(video);
+    } else {
+        const fileLink = document.createElement('a');
+        fileLink.href = `data:${mediaType};base64,${base64Data}`;
+        fileLink.textContent = fileName || 'Download File';
+        fileLink.download = fileName || 'file';
+        fileLink.style.color = '#2c3e50';
+        fileLink.style.textDecoration = 'underline';
+        messageDiv.appendChild(fileLink);
     }
-    element.style.maxWidth = '100%';
-    messageDiv.appendChild(element);
 
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Open media in full-screen overlay
+function openMediaOverlay(src, fileName) {
+    mediaOverlayContent.innerHTML = '';
+    if (src.includes('image')) {
+        const img = document.createElement('img');
+        img.src = src;
+        mediaOverlayContent.appendChild(img);
+    } else if (src.includes('video')) {
+        const video = document.createElement('video');
+        video.src = src;
+        video.controls = true;
+        mediaOverlayContent.appendChild(video);
+    }
+    downloadBtn.href = src;
+    downloadBtn.download = fileName || 'file';
+    mediaOverlay.classList.add('active');
+}
+
+// Close media overlay
+function closeMediaOverlay() {
+    mediaOverlay.classList.remove('active');
+    mediaOverlayContent.innerHTML = '';
 }
 
 // Convert file to Base64 and send
@@ -297,15 +356,20 @@ async function sendMessage() {
     if (file) {
         try {
             const base64Data = await fileToBase64(file);
-            const message = `media:${file.type}:${base64Data}`;
+            const message = `media:${file.type}:${base64Data}:${file.name}`;
             conn.send(message);
-            displayMedia(file.type, base64Data, 'sender');
+            displayMedia(file.type, base64Data, file.name, 'sender');
         } catch (err) {
             console.error("Failed to encode file to Base64:", err);
             alert("Failed to encode and send media.");
         }
         fileInput.value = '';
     }
+}
+
+// Disconnect manually
+function disconnect() {
+    resetConnection();
 }
 
 // Add typing event listener
