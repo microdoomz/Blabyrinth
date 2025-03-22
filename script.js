@@ -7,6 +7,7 @@ let typingMessageElement = null;
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
+const filePreview = document.getElementById('file-preview');
 const status = document.getElementById('status');
 const myCodeDisplay = document.getElementById('my-code');
 const myCodeInput = document.getElementById('my-code-input');
@@ -70,6 +71,7 @@ function resetConnection() {
     disconnectBtn.disabled = true;
     localStorage.removeItem('myConnectionCode');
     localStorage.removeItem('friendCode');
+    clearFilePreview();
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -232,7 +234,7 @@ function displayMessage(text, type) {
     messageDiv.appendChild(contentSpan);
 
     chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    chatBox.scrollTop = chatBox.scrollHeight; // Ensure scrolling works on mobile
 }
 
 // Show typing indicator inside chat box
@@ -256,6 +258,7 @@ function hideTypingIndicator() {
         typingMessageElement.remove();
         typingMessageElement = null;
     }
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
 // Display media from Base64 data
@@ -268,17 +271,40 @@ function displayMedia(mediaType, base64Data, fileName, type) {
     nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
     messageDiv.appendChild(nameSpan);
 
+    const container = document.createElement('div');
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '5px';
+
     if (mediaType.startsWith('image')) {
         const img = document.createElement('img');
         img.src = `data:${mediaType};base64,${base64Data}`;
         img.onclick = () => openMediaOverlay(img.src, fileName);
-        messageDiv.appendChild(img);
+        container.appendChild(img);
+
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `data:${mediaType};base64,${base64Data}`;
+        downloadLink.textContent = '↓';
+        downloadLink.download = fileName || 'image';
+        downloadLink.style.color = '#a30000';
+        downloadLink.style.textDecoration = 'none';
+        downloadLink.style.fontSize = '1.2em';
+        container.appendChild(downloadLink);
     } else if (mediaType.startsWith('video')) {
         const video = document.createElement('video');
         video.src = `data:${mediaType};base64,${base64Data}`;
         video.controls = true;
         video.onclick = () => openMediaOverlay(video.src, fileName);
-        messageDiv.appendChild(video);
+        container.appendChild(video);
+
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `data:${mediaType};base64,${base64Data}`;
+        downloadLink.textContent = '↓';
+        downloadLink.download = fileName || 'video';
+        downloadLink.style.color = '#a30000';
+        downloadLink.style.textDecoration = 'none';
+        downloadLink.style.fontSize = '1.2em';
+        container.appendChild(downloadLink);
     } else {
         const fileLink = document.createElement('a');
         fileLink.href = `data:${mediaType};base64,${base64Data}`;
@@ -286,9 +312,19 @@ function displayMedia(mediaType, base64Data, fileName, type) {
         fileLink.download = fileName || 'file';
         fileLink.style.color = '#a30000';
         fileLink.style.textDecoration = 'underline';
-        messageDiv.appendChild(fileLink);
+        container.appendChild(fileLink);
+
+        const downloadLink = document.createElement('a');
+        downloadLink.href = `data:${mediaType};base64,${base64Data}`;
+        downloadLink.textContent = '↓';
+        downloadLink.download = fileName || 'file';
+        downloadLink.style.color = '#a30000';
+        downloadLink.style.textDecoration = 'none';
+        downloadLink.style.fontSize = '1.2em';
+        container.appendChild(downloadLink);
     }
 
+    messageDiv.appendChild(container);
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -323,11 +359,40 @@ function fileToBase64(file) {
         const reader = new FileReader();
         reader.readAsDataURL(file);
         reader.onload = () => {
-            const base64String = reader.result.split(',')[1]; // Remove "data:mime/type;base64," prefix
+            const base64String = reader.result.split(',')[1];
             resolve(base64String);
         };
         reader.onerror = (error) => reject(error);
     });
+}
+
+// Show file preview
+fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (file) {
+        filePreview.innerHTML = '';
+        if (file.type.startsWith('image')) {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            filePreview.appendChild(img);
+        } else if (file.type.startsWith('video')) {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.controls = true;
+            filePreview.appendChild(video);
+        } else {
+            const fileName = document.createElement('span');
+            fileName.textContent = file.name;
+            filePreview.appendChild(fileName);
+        }
+    } else {
+        clearFilePreview();
+    }
+});
+
+// Clear file preview
+function clearFilePreview() {
+    filePreview.innerHTML = '';
 }
 
 // Send typing event
@@ -365,6 +430,7 @@ async function sendMessage() {
             alert("Failed to encode and send media.");
         }
         fileInput.value = '';
+        clearFilePreview();
     }
 }
 
