@@ -1,4 +1,5 @@
-let node;
+let peer;
+let conn;
 let myConnectionCode = '';
 let typingTimeout;
 const chatBox = document.getElementById('chat-box');
@@ -7,8 +8,7 @@ const fileInput = document.getElementById('file-input');
 const status = document.getElementById('status');
 const myCodeDisplay = document.getElementById('my-code');
 const myCodeInput = document.getElementById('my-code-input');
-const peerIdDisplay = document.getElementById('peer-id');
-const friendPeerIdInput = document.getElementById('friend-peer-id');
+const friendCodeInput = document.getElementById('friend-code');
 const typingIndicator = document.getElementById('typing-indicator');
 const connectBtn = document.getElementById('connect-btn');
 
@@ -19,24 +19,24 @@ window.onload = () => {
 
 // Reset connection state
 function resetConnection() {
-    if (node) {
-        node.stop().catch(err => console.error("Error stopping IPFS node:", err));
+    if (peer) {
+        peer.destroy();
     }
-    node = null;
+    peer = null;
+    conn = null;
     myConnectionCode = '';
     myCodeDisplay.textContent = '';
-    peerIdDisplay.textContent = '';
     myCodeInput.disabled = false;
     myCodeInput.value = '';
-    friendPeerIdInput.value = '';
+    friendCodeInput.value = '';
     status.textContent = '';
     chatBox.innerHTML = '';
     typingIndicator.textContent = '';
     connectBtn.disabled = true;
 }
 
-// Set your custom connection code and initialize IPFS
-async function setMyCode() {
+// Set your custom connection code and initialize PeerJS
+function setMyCode() {
     myConnectionCode = myCodeInput.value.trim();
     if (!myConnectionCode) {
         alert("Please enter a valid code!");
@@ -45,84 +45,92 @@ async function setMyCode() {
     myCodeDisplay.textContent = myConnectionCode;
     myCodeInput.disabled = true;
 
-    // Initialize IPFS node
-    status.textContent = "Initializing IPFS node...";
-    try {
-        node = await Ipfs.create({
-            repo: 'ipfs-' + Math.random(),
-            config: {
-                Addresses: {
-                    Swarm: [
-                        '/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star',
-                        '/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star'
-                    ]
-                }
-            }
-        });
+    // Initialize PeerJS with your custom ID
+    peer = new Peer(myConnectionCode, {
+        host: '0.peerjs.com', // Free PeerJS signaling server
+        port: 443,
+        path: '/',
+        debug: 2 // Enable debug logs for troubleshooting
+    });
 
-        const peerInfo = await node.id();
-        peerIdDisplay.textContent = peerInfo.id;
-        status.textContent = "IPFS node started. Share your Peer ID with your friend!";
-        connectBtn.disabled = false; // Enable the Connect button once the node is ready
-    } catch (err) {
-        status.textContent = "Failed to start IPFS node: " + err;
-        connectBtn.disabled = true;
-    }
+    peer.on('open', () => {
+        status.textContent = "Your ID is set. Share your code with your friend!";
+        connectBtn.disabled = false; // Enable the Connect button
+    });
+
+    peer.on('error', (err) => {
+        status.textContent = "PeerJS error: " + err;
+        console.error("PeerJS error:", err);
+        resetConnection();
+    });
+
+    // Handle incoming connections
+    peer.on('connection', (connection) => {
+        conn = connection;
+        setupConnection();
+    });
 }
 
-// Connect to your friend's IPFS Peer ID with retry logic
-async function connectToFriend() {
-    if (!myConnectionCode || !node) {
+// Connect to your friend's ID with retry logic
+function connectToFriend() {
+    if (!myConnectionCode) {
         alert("Please set your connection code first!");
         return;
     }
-    const friendPeerId = friendPeerIdInput.value.trim();
-    if (!friendPeerId) {
-        alert("Please enter your friend's IPFS Peer ID!");
+    const friendCode = friendCodeInput.value.trim();
+    if (!friendCode) {
+        alert("Please enter your friend's connection code!");
         return;
     }
 
-    // Try to connect to the friend's peer with retries
-    status.textContent = "Connecting to friend...";
-    await attemptConnection(friendPeerId, 3, 3000); // Retry 3 times, 3-second delay
+    status.textContent = "Attempting to connect to " + friendCode + "...";
+    attemptConnection(friendCode, 3, 2000); // Retry 3 times, 2-second delay
 }
 
-async function attemptConnection(friendPeerId, retries, delay) {
+// Retry connection with delay
+function attemptConnection(friendCode, retries, delay) {
     if (retries <= 0) {
-        status.textContent = "Failed to connect to friend. Please ensure they are online and try again.";
+        status.textContent = "Failed to connect to " + friendCode + ". Please ensure they are online and try again.";
         return;
     }
 
-    try {
-        await node.swarm.connect(`/p2p/${friendPeerId}`);
-        status.textContent = "Connected to friend! Subscribing to chat channel...";
+    conn = peer.connect(friendCode);
+    conn.on('open', () => {
+        setupConnection();
+    });
 
-        // Use a pubsub channel based on the connection codes
-        const channel = `chat-${[myConnectionCode, friendPeerId].sort().join('-')}`;
-        await node.pubsub.subscribe(channel, (msg) => {
-            const data = new TextDecoder().decode(msg.data);
-            try {
-                const parsedData = JSON.parse(data);
-                if (parsedData.type === 'typing') {
-                    if (parsedData.isTyping) {
-                        typingIndicator.textContent = "Friend is typing...";
-                    } else {
-                        typingIndicator.textContent = "";
-                    }
-                } else {
-                    displayMessage(parsedData);
-                }
-            } catch (err) {
+    conn.on('error', (err) => {
+        status.textContent = "Connection attempt failed. Retrying... (" + retries + " attempts left)";
+        setTimeout(() => {
+            attemptConnection(friendCode, retries - 1, delay);
+        }, delay);
+    });
+}
+
+// Set up the connection for sending/receiving messages
+function setupConnection() {
+    status.textContent = "Connected! Start chatting.";
+    conn.on('data', (data) => {
+        if (typeof data === 'string') {
+            if (data.startsWith('typing:')) {
+                const isTyping = data.split(':')[1] === 'true';
+                typingIndicator.textContent = isTyping ? "Friend is typing..." : "";
+            } else {
                 displayMessage(data);
             }
-        });
-        status.textContent = "Connected! Start chatting.";
-    } catch (err) {
-        status.textContent = `Connection attempt failed. Retrying... (${retries} attempts left)`;
-        setTimeout(async () => {
-            await attemptConnection(friendPeerId, retries - 1, delay);
-        }, delay);
-    }
+        } else {
+            displayMessage(data);
+        }
+    });
+
+    conn.on('close', () => {
+        status.textContent = "Connection closed.";
+        conn = null;
+    });
+
+    conn.on('error', (err) => {
+        status.textContent = "Connection error: " + err;
+    });
 }
 
 // Display incoming or outgoing messages/files
@@ -132,7 +140,6 @@ function displayMessage(data) {
         msg.textContent = data;
         chatBox.appendChild(msg);
     } else if (data.type && data.content) {
-        // Handle media
         const blob = new Blob([new Uint8Array(data.content)], { type: data.type });
         const url = URL.createObjectURL(blob);
         const element = data.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
@@ -147,50 +154,39 @@ function displayMessage(data) {
 }
 
 // Send typing event
-async function sendTypingEvent(isTyping) {
-    if (!node || !friendPeerIdInput.value.trim()) return;
-
-    const channel = `chat-${[myConnectionCode, friendPeerIdInput.value.trim()].sort().join('-')}`;
-    const message = JSON.stringify({ type: 'typing', isTyping });
-    await node.pubsub.publish(channel, new TextEncoder().encode(message));
+function sendTypingEvent(isTyping) {
+    if (!conn || !conn.open) return;
+    conn.send(`typing:${isTyping}`);
 }
 
 // Send text or file
-async function sendMessage() {
-    if (!node) {
+function sendMessage() {
+    if (!conn || !conn.open) {
         alert("Not connected yet! Connect to your friend first.");
         return;
     }
 
-    const friendPeerId = friendPeerIdInput.value.trim();
-    if (!friendPeerId) {
-        alert("Please enter your friend's IPFS Peer ID!");
-        return;
-    }
-
-    const channel = `chat-${[myConnectionCode, friendPeerId].sort().join('-')}`;
     const text = messageInput.value;
     const file = fileInput.files[0];
 
     // Clear typing indicator when sending a message
-    await sendTypingEvent(false);
+    sendTypingEvent(false);
 
     if (text) {
-        const message = "Friend: " + text;
-        await node.pubsub.publish(channel, new TextEncoder().encode(message));
+        conn.send("Friend: " + text);
         displayMessage("You: " + text);
         messageInput.value = '';
     }
     if (file) {
         const reader = new FileReader();
-        reader.onload = async () => {
+        reader.onload = () => {
             const arrayBuffer = reader.result;
-            const message = JSON.stringify({
+            const message = {
                 type: file.type,
                 content: Array.from(new Uint8Array(arrayBuffer))
-            });
-            await node.pubsub.publish(channel, new TextEncoder().encode(message));
-            displayMessage({ type: file.type, content: new Uint8Array(arrayBuffer) });
+            };
+            conn.send(message);
+            displayMessage(message);
         };
         reader.readAsArrayBuffer(file);
         fileInput.value = '';
@@ -199,7 +195,7 @@ async function sendMessage() {
 
 // Add typing event listener
 messageInput.addEventListener('input', () => {
-    if (!node || !friendPeerIdInput.value.trim()) return;
+    if (!conn || !conn.open) return;
 
     // Send typing event when user starts typing
     sendTypingEvent(true);
