@@ -279,12 +279,14 @@ function generateMessageId() {
 // Convert timestamp to IST and format like WhatsApp
 function formatTimestamp(timestamp) {
     const date = new Date(timestamp);
-    // Convert to IST (UTC +5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
-    const istDate = new Date(date.getTime() + istOffset);
-    const hours = istDate.getHours() % 12 || 12;
-    const minutes = istDate.getMinutes().toString().padStart(2, '0');
-    const ampm = istDate.getHours() >= 12 ? 'pm' : 'am';
+    // Get the UTC time and adjust for IST (UTC +5:30)
+    const istOffset = 5.5 * 60; // 5 hours 30 minutes in minutes
+    const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
+    const istMinutes = (utcMinutes + istOffset) % (24 * 60);
+    const istHours = Math.floor(istMinutes / 60);
+    const minutes = (istMinutes % 60).toString().padStart(2, '0');
+    const hours = istHours % 12 || 12;
+    const ampm = istHours >= 12 ? 'pm' : 'am';
     return `${hours}:${minutes} ${ampm}`;
 }
 
