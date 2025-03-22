@@ -5,7 +5,7 @@ let friendCode = '';
 let typingTimeout;
 let typingMessageElement = null;
 let replyingToMessage = null;
-let messageStatuses = new Map(); // Track message statuses
+let messageStatuses = new Map();
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
@@ -20,6 +20,7 @@ const mediaOverlay = document.getElementById('media-overlay');
 const mediaOverlayContent = document.getElementById('media-overlay-content');
 const downloadBtn = document.getElementById('download-btn');
 const replyOverlay = document.getElementById('reply-overlay');
+const replyPreview = document.getElementById('reply-preview');
 
 // List of PeerJS servers for fallback
 const peerJsServers = [
@@ -47,6 +48,8 @@ window.onload = () => {
             connectToFriend();
         }
     }
+    // Ensure reply overlay is hidden on load
+    replyOverlay.style.display = 'none';
 };
 
 // Reset connection state
@@ -77,6 +80,7 @@ function resetConnection() {
     clearFilePreview();
     replyingToMessage = null;
     messageStatuses.clear();
+    replyOverlay.style.display = 'none';
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -201,12 +205,12 @@ function setupConnection() {
                     hideTypingIndicator();
                 }
             } else if (data.startsWith('media:')) {
-                const [_, mediaType, base64Data, fileName, messageId] = data.split(':');
-                displayMedia(mediaType, base64Data, fileName, 'receiver', messageId);
+                const [_, mediaType, base64Data, fileName, messageId, timestamp] = data.split(':');
+                displayMedia(mediaType, base64Data, fileName, 'receiver', messageId, parseInt(timestamp));
                 conn.send(`delivered:${messageId}`);
             } else if (data.startsWith('reply:')) {
-                const [_, replyTo, message, messageId] = data.split(':', 4);
-                displayMessage(message, 'receiver', replyTo, messageId);
+                const [_, replyTo, message, messageId, timestamp] = data.split(':', 5);
+                displayMessage(message, 'receiver', replyTo, messageId, parseInt(timestamp));
                 conn.send(`delivered:${messageId}`);
             } else if (data.startsWith('delivered:')) {
                 const messageId = data.split(':')[1];
@@ -215,9 +219,9 @@ function setupConnection() {
                 const messageId = data.split(':')[1];
                 updateMessageStatus(messageId, 'seen');
             } else {
-                const messageId = data.split(':')[0];
-                const message = data.split(':').slice(1).join(':');
-                displayMessage(message, 'receiver', null, messageId);
+                const [messageId, timestamp, ...messageParts] = data.split(':');
+                const message = messageParts.join(':');
+                displayMessage(message, 'receiver', null, messageId, parseInt(timestamp));
                 conn.send(`delivered:${messageId}`);
             }
         }
@@ -241,7 +245,8 @@ function setupConnection() {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const messageId = entry.target.dataset.messageId;
-                if (messageId && messageStatuses.get(messageId) === 'delivered') {
+                const currentStatus = messageStatuses.get(messageId);
+                if (messageId && currentStatus === 'delivered') {
                     conn.send(`seen:${messageId}`);
                     updateMessageStatus(messageId, 'seen');
                 }
@@ -249,17 +254,38 @@ function setupConnection() {
         });
     }, { root: chatBox, threshold: 0.5 });
 
-    chatBox.addEventListener('scroll', () => {
+    // Observe existing messages and new ones
+    const observeMessages = () => {
         const messages = chatBox.querySelectorAll('.message.receiver');
         messages.forEach(message => {
             observer.observe(message);
         });
-    });
+    };
+
+    // Initial observation
+    observeMessages();
+
+    // Observe on scroll and new messages
+    chatBox.addEventListener('scroll', observeMessages);
+    const mutationObserver = new MutationObserver(observeMessages);
+    mutationObserver.observe(chatBox, { childList: true });
 }
 
 // Generate a unique message ID
 function generateMessageId() {
     return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// Convert timestamp to IST and format like WhatsApp
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    // Convert to IST (UTC +5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istDate = new Date(date.getTime() + istOffset);
+    const hours = istDate.getHours() % 12 || 12;
+    const minutes = istDate.getMinutes().toString().padStart(2, '0');
+    const ampm = istDate.getHours() >= 12 ? 'pm' : 'am';
+    return `${hours}:${minutes} ${ampm}`;
 }
 
 // Update message status
@@ -275,9 +301,10 @@ function updateMessageStatus(messageId, status) {
 }
 
 // Display incoming or outgoing text messages
-function displayMessage(text, type, replyTo = null, messageId = null) {
+function displayMessage(text, type, replyTo = null, messageId = null, timestamp = null) {
     if (!messageId) {
         messageId = generateMessageId();
+        timestamp = Date.now();
     }
 
     const messageDiv = document.createElement('div');
@@ -302,16 +329,24 @@ function displayMessage(text, type, replyTo = null, messageId = null) {
     contentSpan.textContent = text;
     messageDiv.appendChild(contentSpan);
 
+    const metaDiv = document.createElement('div');
+    metaDiv.classList.add('meta');
+    const timeSpan = document.createElement('span');
+    timeSpan.textContent = formatTimestamp(timestamp);
+    metaDiv.appendChild(timeSpan);
+
     if (type === 'sender') {
         const statusTicks = document.createElement('span');
         statusTicks.classList.add('status-ticks', 'sent');
-        contentSpan.appendChild(statusTicks);
+        metaDiv.appendChild(statusTicks);
         messageStatuses.set(messageId, 'sent');
     }
 
+    messageDiv.appendChild(metaDiv);
     chatBox.appendChild(messageDiv);
     scrollToBottom();
     addSwipeAndLongPress(messageDiv);
+    return messageId;
 }
 
 // Show typing indicator inside chat box
@@ -339,13 +374,15 @@ function hideTypingIndicator() {
 }
 
 // Display media from Base64 data
-function displayMedia(mediaType, base64Data, fileName, type, messageId = null) {
+function displayMedia(mediaType, base64Data, fileName, type, messageId = null, timestamp = null) {
     if (!messageId) {
         messageId = generateMessageId();
+        timestamp = Date.now();
     }
 
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
+    messageDiv.dataset.message = fileName || 'Media';
     messageDiv.dataset.messageId = messageId;
 
     const nameSpan = document.createElement('span');
@@ -406,16 +443,25 @@ function displayMedia(mediaType, base64Data, fileName, type, messageId = null) {
         container.appendChild(downloadLink);
     }
 
+    const metaDiv = document.createElement('div');
+    metaDiv.classList.add('meta');
+    const timeSpan = document.createElement('span');
+    timeSpan.textContent = formatTimestamp(timestamp);
+    metaDiv.appendChild(timeSpan);
+
     if (type === 'sender') {
         const statusTicks = document.createElement('span');
         statusTicks.classList.add('status-ticks', 'sent');
-        container.appendChild(statusTicks);
+        metaDiv.appendChild(statusTicks);
         messageStatuses.set(messageId, 'sent');
     }
 
     messageDiv.appendChild(container);
+    messageDiv.appendChild(metaDiv);
     chatBox.appendChild(messageDiv);
     scrollToBottom();
+    addSwipeAndLongPress(messageDiv);
+    return messageId;
 }
 
 // Open media in full-screen overlay
@@ -487,7 +533,9 @@ function clearFilePreview() {
 // Scroll to bottom of chat box
 function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
-    chatBox.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    setTimeout(() => {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }, 0);
 }
 
 // Send typing event
@@ -506,6 +554,7 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     const file = fileInput.files[0];
     const messageId = generateMessageId();
+    const timestamp = Date.now();
 
     // Clear typing indicator when sending a message
     sendTypingEvent(false);
@@ -513,21 +562,21 @@ async function sendMessage() {
     if (text) {
         if (replyingToMessage) {
             const replyTo = replyingToMessage.dataset.message;
-            conn.send(`reply:${replyTo}:${text}:${messageId}`);
-            displayMessage(text, 'sender', replyTo, messageId);
+            conn.send(`reply:${replyTo}:${text}:${messageId}:${timestamp}`);
+            displayMessage(text, 'sender', replyTo, messageId, timestamp);
             replyingToMessage = null;
         } else {
-            conn.send(`${messageId}:${text}`);
-            displayMessage(text, 'sender', null, messageId);
+            conn.send(`${messageId}:${timestamp}:${text}`);
+            displayMessage(text, 'sender', null, messageId, timestamp);
         }
         messageInput.value = '';
     }
     if (file) {
         try {
             const base64Data = await fileToBase64(file);
-            const message = `media:${file.type}:${base64Data}:${file.name}:${messageId}`;
+            const message = `media:${file.type}:${base64Data}:${file.name}:${messageId}:${timestamp}`;
             conn.send(message);
-            displayMedia(file.type, base64Data, file.name, 'sender', messageId);
+            displayMedia(file.type, base64Data, file.name, 'sender', messageId, timestamp);
         } catch (err) {
             console.error("Failed to encode file to Base64:", err);
             alert("Failed to encode and send media.");
@@ -589,8 +638,8 @@ function addSwipeAndLongPress(messageDiv) {
         const currentX = e.changedTouches[0].clientX;
         const diffX = currentX - startX;
         if (diffX > 50) {
-            showReplyOverlay(messageDiv);
-            initiateReply(); // Auto-enable reply on swipe
+            showReplyOverlay(messageDiv, true);
+            initiateReply();
         }
         messageDiv.style.transform = 'translateX(0)';
         isSwiping = false;
@@ -598,16 +647,22 @@ function addSwipeAndLongPress(messageDiv) {
 
     messageDiv.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        showReplyOverlay(messageDiv);
+        showReplyOverlay(messageDiv, false);
     });
 }
 
-function showReplyOverlay(messageDiv) {
+function showReplyOverlay(messageDiv, isDragged) {
     replyingToMessage = messageDiv;
     const rect = messageDiv.getBoundingClientRect();
     replyOverlay.style.display = 'flex';
     replyOverlay.style.top = `${rect.top + window.scrollY}px`;
     replyOverlay.style.left = `${rect.left + rect.width - 80}px`;
+    replyPreview.textContent = messageDiv.dataset.message;
+    if (isDragged) {
+        replyOverlay.classList.add('dragged');
+    } else {
+        replyOverlay.classList.remove('dragged');
+    }
 }
 
 function initiateReply() {
