@@ -95,9 +95,14 @@ button {
     transition: background 0.3s ease, transform 0.1s ease;
 }
 
-button:hover {
+button:hover:not(:disabled) {
     background: #e65b50;
     transform: scale(1.05);
+}
+
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
 }
 
 #file-input {
