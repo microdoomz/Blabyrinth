@@ -1,6 +1,5 @@
 let peer;
 let conn;
-let ipfsNode;
 let myConnectionCode = '';
 let friendCode = '';
 let typingTimeout;
@@ -25,7 +24,6 @@ let currentServerIndex = 0;
 // Reset UI on page load
 window.onload = () => {
     resetConnection();
-    initializeIpfs();
 };
 
 // Reset connection state
@@ -50,27 +48,6 @@ function resetConnection() {
         typingMessageElement = null;
     }
     connectBtn.disabled = true;
-}
-
-// Initialize IPFS node for media sharing
-async function initializeIpfs() {
-    try {
-        ipfsNode = await Ipfs.create({
-            repo: 'ipfs-' + Math.random(),
-            config: {
-                Addresses: {
-                    Swarm: [
-                        '/dns4/wss0.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star',
-                        '/dns4/wss1.bootstrap.libp2p.io/tcp/443/wss/p2p-websocket-star'
-                    ]
-                }
-            }
-        });
-        console.log("IPFS node initialized successfully");
-    } catch (err) {
-        console.error("Failed to initialize IPFS node:", err);
-        status.textContent = "Failed to initialize IPFS for media sharing.";
-    }
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -195,8 +172,8 @@ function setupConnection() {
                     hideTypingIndicator();
                 }
             } else if (data.startsWith('media:')) {
-                const cid = data.split('media:')[1];
-                fetchMediaFromIpfs(cid, 'receiver');
+                const [_, mediaType, base64Data] = data.split(':');
+                displayMedia(mediaType, base64Data, 'receiver');
             } else {
                 displayMessage(data, 'receiver');
             }
@@ -258,64 +235,39 @@ function hideTypingIndicator() {
     }
 }
 
-// Upload media to IPFS and share the CID
-async function uploadMediaToIpfs(file) {
-    if (!ipfsNode) {
-        alert("IPFS node is not initialized. Cannot share media.");
-        return null;
+// Display media from Base64 data
+function displayMedia(mediaType, base64Data, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message', type);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('name');
+    nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
+    messageDiv.appendChild(nameSpan);
+
+    const element = mediaType.startsWith('image') ? document.createElement('img') : document.createElement('video');
+    element.src = `data:${mediaType};base64,${base64Data}`;
+    if (element.tagName === 'VIDEO') {
+        element.controls = true;
     }
-    try {
-        const reader = new FileReader();
-        reader.readAsArrayBuffer(file);
-        return new Promise((resolve, reject) => {
-            reader.onload = async () => {
-                const buffer = reader.result;
-                const { cid } = await ipfsNode.add(buffer);
-                resolve(cid.toString());
-            };
-            reader.onerror = reject;
-        });
-    } catch (err) {
-        console.error("Failed to upload media to IPFS:", err);
-        return null;
-    }
+    element.style.maxWidth = '100%';
+    messageDiv.appendChild(element);
+
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-// Fetch media from IPFS using CID
-async function fetchMediaFromIpfs(cid, type) {
-    if (!ipfsNode) {
-        alert("IPFS node is not initialized. Cannot fetch media.");
-        return;
-    }
-    try {
-        const stream = ipfsNode.cat(cid);
-        const chunks = [];
-        for await (const chunk of stream) {
-            chunks.push(chunk);
-        }
-        const buffer = new Blob(chunks);
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('message', type);
-
-        const nameSpan = document.createElement('span');
-        nameSpan.classList.add('name');
-        nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
-        messageDiv.appendChild(nameSpan);
-
-        const element = buffer.type && buffer.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
-        element.src = URL.createObjectURL(buffer);
-        if (element.tagName === 'VIDEO') {
-            element.controls = true;
-        }
-        element.style.maxWidth = '100%';
-        messageDiv.appendChild(element);
-
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    } catch (err) {
-        console.error("Failed to fetch media from IPFS:", err);
-        status.textContent = "Failed to fetch media.";
-    }
+// Convert file to Base64 and send
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = reader.result.split(',')[1]; // Remove "data:mime/type;base64," prefix
+            resolve(base64String);
+        };
+        reader.onerror = (error) => reject(error);
+    });
 }
 
 // Send typing event
@@ -343,12 +295,14 @@ async function sendMessage() {
         messageInput.value = '';
     }
     if (file) {
-        const cid = await uploadMediaToIpfs(file);
-        if (cid) {
-            conn.send(`media:${cid}`);
-            fetchMediaFromIpfs(cid, 'sender');
-        } else {
-            alert("Failed to upload media to IPFS.");
+        try {
+            const base64Data = await fileToBase64(file);
+            const message = `media:${file.type}:${base64Data}`;
+            conn.send(message);
+            displayMedia(file.type, base64Data, 'sender');
+        } catch (err) {
+            console.error("Failed to encode file to Base64:", err);
+            alert("Failed to encode and send media.");
         }
         fileInput.value = '';
     }
