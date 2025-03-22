@@ -19,7 +19,7 @@ const disconnectBtn = document.getElementById('disconnect-btn');
 const mediaOverlay = document.getElementById('media-overlay');
 const mediaOverlayContent = document.getElementById('media-overlay-content');
 const downloadBtn = document.getElementById('download-btn');
-const replyOverlay = document.getElementById('reply-overlay');
+const replyPreviewArea = document.getElementById('reply-preview-area');
 const replyPreview = document.getElementById('reply-preview');
 
 // List of PeerJS servers for fallback
@@ -48,8 +48,8 @@ window.onload = () => {
             connectToFriend();
         }
     }
-    // Ensure reply overlay is hidden on load
-    replyOverlay.style.display = 'none';
+    // Ensure reply preview area is hidden on load
+    replyPreviewArea.classList.remove('active');
 };
 
 // Reset connection state
@@ -80,7 +80,7 @@ function resetConnection() {
     clearFilePreview();
     replyingToMessage = null;
     messageStatuses.clear();
-    replyOverlay.style.display = 'none';
+    replyPreviewArea.classList.remove('active');
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -572,7 +572,7 @@ async function sendMessage() {
             conn.send(`reply:${replyTo}:${text}:${messageId}:${timestamp}`);
             displayMessage(text, 'sender', replyTo, messageId, timestamp);
             replyingToMessage = null;
-            replyOverlay.style.display = 'none';
+            replyPreviewArea.classList.remove('active');
         } else {
             conn.send(`${messageId}:${timestamp}:${text}`);
             displayMessage(text, 'sender', null, messageId, timestamp);
@@ -637,12 +637,12 @@ function addSwipeAndLongPress(messageDiv) {
         const diffX = currentX - startX;
         if (diffX > 50) {
             messageDiv.style.transform = 'translateX(50px)';
-            showReplyOverlay(messageDiv, true);
+            showReplyPreview(messageDiv);
             // Automatically open the keyboard
             messageInput.focus();
         } else {
             messageDiv.style.transform = 'translateX(0)';
-            replyOverlay.style.display = 'none';
+            replyPreviewArea.classList.remove('active');
         }
     });
 
@@ -650,9 +650,9 @@ function addSwipeAndLongPress(messageDiv) {
         const currentX = e.changedTouches[0].clientX;
         const diffX = currentX - startX;
         if (diffX > 50) {
-            // Keep the overlay visible for user to confirm or cancel
+            // Keep the preview visible for user to type or cancel
         } else {
-            replyOverlay.style.display = 'none';
+            replyPreviewArea.classList.remove('active');
             replyingToMessage = null;
         }
         messageDiv.style.transform = 'translateX(0)';
@@ -661,42 +661,37 @@ function addSwipeAndLongPress(messageDiv) {
 
     messageDiv.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        showReplyOverlay(messageDiv, false);
+        showReplyPreview(messageDiv);
         messageInput.focus();
     });
 }
 
-function showReplyOverlay(messageDiv, isDragged) {
+function showReplyPreview(messageDiv) {
     replyingToMessage = messageDiv;
-    const rect = messageDiv.getBoundingClientRect();
-    replyOverlay.style.display = 'flex';
-    replyOverlay.style.top = `${rect.top + window.scrollY}px`;
-    replyOverlay.style.left = `${rect.left + rect.width - 80}px`;
+    replyPreviewArea.classList.add('active');
 
-    // Show preview (image or text)
+    // Show preview (image, video, or text)
     replyPreview.innerHTML = '';
-    if (messageDiv.dataset.mediaType && messageDiv.dataset.mediaType.startsWith('image')) {
-        const img = document.createElement('img');
-        img.src = messageDiv.dataset.mediaSrc;
-        replyPreview.appendChild(img);
+    if (messageDiv.dataset.mediaType) {
+        if (messageDiv.dataset.mediaType.startsWith('image')) {
+            const img = document.createElement('img');
+            img.src = messageDiv.dataset.mediaSrc;
+            replyPreview.appendChild(img);
+        } else if (messageDiv.dataset.mediaType.startsWith('video')) {
+            const video = document.createElement('video');
+            video.src = messageDiv.dataset.mediaSrc;
+            video.controls = true;
+            replyPreview.appendChild(video);
+        } else {
+            replyPreview.textContent = messageDiv.dataset.message;
+        }
     } else {
         replyPreview.textContent = messageDiv.dataset.message;
     }
-
-    if (isDragged) {
-        replyOverlay.classList.add('dragged');
-    } else {
-        replyOverlay.classList.remove('dragged');
-    }
-}
-
-function initiateReply() {
-    replyOverlay.style.display = 'none';
-    messageInput.focus();
 }
 
 function cancelReply() {
     replyingToMessage = null;
-    replyOverlay.style.display = 'none';
+    replyPreviewArea.classList.remove('active');
     messageInput.blur(); // Close the keyboard if open
 }
