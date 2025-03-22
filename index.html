@@ -20,13 +20,16 @@
         <p class="label">Your connection code: <span id="my-code"></span></p>
         <p class="label">Enter your friend's code to connect:</p>
         <input type="text" id="friend-code" placeholder="Friend's connection code">
-        <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
-        <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+        <div class="button-group">
+            <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
+            <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
         <div id="chat-box"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type a message...">
             <label for="file-input" class="file-label">Choose File</label>
             <input type="file" id="file-input" accept="*">
+            <div id="file-preview" class="file-preview"></div>
             <button onclick="sendMessage()">Send</button>
         </div>
     </div>
