@@ -160,4 +160,92 @@ function displayMessage(data, type) {
     messageDiv.classList.add('message', type);
 
     if (typeof data === 'string') {
-        const name
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('name');
+        nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
+        messageDiv.appendChild(nameSpan);
+
+        const contentSpan = document.createElement('span');
+        contentSpan.textContent = data;
+        messageDiv.appendChild(contentSpan);
+    } else if (data.type && data.content) {
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('name');
+        nameSpan.textContent = (type === 'sender' ? myConnectionCode : friendCode) + ':';
+        messageDiv.appendChild(nameSpan);
+
+        const element = data.type.startsWith('image') ? document.createElement('img') : document.createElement('video');
+        const blob = new Blob([new Uint8Array(data.content)], { type: data.type });
+        element.src = URL.createObjectURL(blob);
+        if (element.tagName === 'VIDEO') {
+            element.controls = true;
+        }
+        element.style.maxWidth = '100%';
+        messageDiv.appendChild(element);
+    }
+
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+// Send typing event
+function sendTypingEvent(isTyping) {
+    if (!conn || !conn.open) return;
+    conn.send(`typing:${isTyping}`);
+}
+
+// Send text or file
+function sendMessage() {
+    if (!conn || !conn.open) {
+        alert("Not connected yet! Connect to your friend first.");
+        return;
+    }
+
+    const text = messageInput.value.trim();
+    const file = fileInput.files[0];
+
+    // Clear typing indicator when sending a message
+    sendTypingEvent(false);
+
+    if (text) {
+        conn.send(text);
+        displayMessage(text, 'sender');
+        messageInput.value = '';
+    }
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const arrayBuffer = reader.result;
+            const message = {
+                type: file.type,
+                content: Array.from(new Uint8Array(arrayBuffer))
+            };
+            conn.send(message);
+            displayMessage(message, 'sender');
+        };
+        reader.readAsArrayBuffer(file);
+        fileInput.value = '';
+    }
+}
+
+// Add typing event listener
+messageInput.addEventListener('input', () => {
+    if (!conn || !conn.open) return;
+
+    // Send typing event when user starts typing
+    sendTypingEvent(true);
+
+    // Clear typing event after 2 seconds of inactivity
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        sendTypingEvent(false);
+    }, 2000);
+});
+
+// Send message on Enter key
+messageInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
+    }
+});
