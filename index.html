@@ -33,10 +33,10 @@
         <div id="chat-box"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type a message...">
-            <label for="file-input" class="file-label">Choose File</label>
+            <label for="file-input" class="file-label">📎</label>
             <input type="file" id="file-input" accept="*">
             <div id="file-preview" class="file-preview"></div>
-            <button onclick="sendMessage()">Send</button>
+            <button onclick="sendMessage()" class="send-btn">➤</button>
         </div>
     </div>
     <!-- Full-screen overlay for media -->
@@ -50,6 +50,7 @@
     <!-- Reply action overlay -->
     <div id="reply-overlay" class="reply-overlay">
         <button onclick="initiateReply()">Reply</button>
+        <button onclick="cancelReply()" class="cancel-reply">×</button>
     </div>
     <script src="script.js"></script>
 </body>
