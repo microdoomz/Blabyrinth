@@ -246,7 +246,7 @@ function setupConnection() {
             if (entry.isIntersecting) {
                 const messageId = entry.target.dataset.messageId;
                 const currentStatus = messageStatuses.get(messageId);
-                if (messageId && currentStatus === 'delivered') {
+                if (messageId && currentStatus === 'delivered' && conn && conn.open) {
                     conn.send(`seen:${messageId}`);
                     updateMessageStatus(messageId, 'seen');
                 }
@@ -258,7 +258,10 @@ function setupConnection() {
     const observeMessages = () => {
         const messages = chatBox.querySelectorAll('.message.receiver');
         messages.forEach(message => {
-            observer.observe(message);
+            if (!message.dataset.observed) {
+                observer.observe(message);
+                message.dataset.observed = 'true';
+            }
         });
     };
 
@@ -297,8 +300,8 @@ function updateMessageStatus(messageId, status) {
         const statusText = messageDiv.querySelector('.status-text');
         if (statusText) {
             statusText.className = `status-text ${status}`;
+            messageStatuses.set(messageId, status);
         }
-        messageStatuses.set(messageId, status);
     }
 }
 
@@ -635,6 +638,8 @@ function addSwipeAndLongPress(messageDiv) {
         if (diffX > 50) {
             messageDiv.style.transform = 'translateX(50px)';
             showReplyOverlay(messageDiv, true);
+            // Automatically open the keyboard
+            messageInput.focus();
         } else {
             messageDiv.style.transform = 'translateX(0)';
             replyOverlay.style.display = 'none';
@@ -648,6 +653,7 @@ function addSwipeAndLongPress(messageDiv) {
             // Keep the overlay visible for user to confirm or cancel
         } else {
             replyOverlay.style.display = 'none';
+            replyingToMessage = null;
         }
         messageDiv.style.transform = 'translateX(0)';
         isSwiping = false;
@@ -656,6 +662,7 @@ function addSwipeAndLongPress(messageDiv) {
     messageDiv.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         showReplyOverlay(messageDiv, false);
+        messageInput.focus();
     });
 }
 
@@ -691,4 +698,5 @@ function initiateReply() {
 function cancelReply() {
     replyingToMessage = null;
     replyOverlay.style.display = 'none';
+    messageInput.blur(); // Close the keyboard if open
 }
