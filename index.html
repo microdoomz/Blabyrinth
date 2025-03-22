@@ -10,6 +10,7 @@
 </head>
 <body>
     <div class="container">
+        <div id="status" class="status"></div>
         <h1>Simple P2P Chat</h1>
         <p class="label">Set your connection code:</p>
         <input type="text" id="my-code-input" placeholder="Your custom code">
@@ -19,11 +20,14 @@
         <input type="text" id="friend-code" placeholder="Friend's connection code">
         <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
         <div id="chat-box"></div>
-        <div id="typing-indicator"></div>
+        <div id="typing-indicator" class="typing-indicator">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>
         <input type="text" id="message-input" placeholder="Type a message...">
         <input type="file" id="file-input" accept="image/*,video/*">
         <button onclick="sendMessage()">Send</button>
-        <div id="status"></div>
     </div>
     <script src="script.js"></script>
 </body>
