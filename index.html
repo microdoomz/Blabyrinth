@@ -14,16 +14,22 @@
     <div class="container">
         <div id="status" class="status"></div>
         <h1>Blabyrinth</h1>
-        <p class="label">Set your connection code:</p>
-        <input type="text" id="my-code-input" placeholder="Your custom code">
-        <button onclick="setMyCode()">Set Code</button>
-        <p class="label">Your connection code: <span id="my-code"></span></p>
-        <p class="label">Enter your friend's code to connect:</p>
-        <input type="text" id="friend-code" placeholder="Friend's connection code">
-        <div class="button-group">
-            <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
-            <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+        <div class="code-inputs">
+            <div class="code-input">
+                <p class="label">Set your connection code:</p>
+                <input type="text" id="my-code-input" placeholder="Your custom code">
+                <button onclick="setMyCode()">Set Code</button>
+            </div>
+            <div class="code-input">
+                <p class="label">Enter your friend's code to connect:</p>
+                <input type="text" id="friend-code" placeholder="Friend's connection code">
+                <div class="button-group">
+                    <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
+                    <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+                </div>
+            </div>
         </div>
+        <p class="label">Your connection code: <span id="my-code"></span></p>
         <div id="chat-box"></div>
         <div class="input-container">
             <input type="text" id="message-input" placeholder="Type a message...">
@@ -40,6 +46,10 @@
             <div id="media-overlay-content"></div>
             <a id="download-btn" class="download-btn" download>Download</a>
         </div>
+    </div>
+    <!-- Reply action overlay -->
+    <div id="reply-overlay" class="reply-overlay">
+        <button onclick="initiateReply()">Reply</button>
     </div>
     <script src="script.js"></script>
 </body>
