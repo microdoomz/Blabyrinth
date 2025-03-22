@@ -68,7 +68,7 @@ h1 {
     margin: 10px 0;
 }
 
-#message-input, #friend-peer-id, #my-code-input {
+#message-input, #friend-code, #my-code-input {
     width: 60%;
     padding: 10px;
     margin: 10px 0;
@@ -78,7 +78,7 @@ h1 {
     transition: border-color 0.3s ease;
 }
 
-#message-input:focus, #friend-peer-id:focus, #my-code-input:focus {
+#message-input:focus, #friend-code:focus, #my-code-input:focus {
     border-color: #ff6f61;
     outline: none;
 }
@@ -109,13 +109,13 @@ button:disabled {
     margin: 10px 0;
 }
 
-#status, #my-code, #peer-id {
+#status, #my-code {
     color: #777;
     margin-top: 10px;
     font-size: 0.9em;
 }
 
-#my-code, #peer-id {
+#my-code {
     font-weight: bold;
     color: #ff6f61;
 }
