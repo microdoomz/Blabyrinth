@@ -5,6 +5,7 @@ let friendCode = '';
 let typingTimeout;
 let typingMessageElement = null;
 let replyingToMessage = null;
+let messageStatuses = new Map(); // Track message statuses
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const fileInput = document.getElementById('file-input');
@@ -75,6 +76,7 @@ function resetConnection() {
     localStorage.removeItem('friendCode');
     clearFilePreview();
     replyingToMessage = null;
+    messageStatuses.clear();
 }
 
 // Set your custom connection code and initialize PeerJS with fallback
@@ -199,13 +201,24 @@ function setupConnection() {
                     hideTypingIndicator();
                 }
             } else if (data.startsWith('media:')) {
-                const [_, mediaType, base64Data, fileName] = data.split(':');
-                displayMedia(mediaType, base64Data, fileName, 'receiver');
+                const [_, mediaType, base64Data, fileName, messageId] = data.split(':');
+                displayMedia(mediaType, base64Data, fileName, 'receiver', messageId);
+                conn.send(`delivered:${messageId}`);
             } else if (data.startsWith('reply:')) {
-                const [_, replyTo, message] = data.split(':', 3);
-                displayMessage(message, 'receiver', replyTo);
+                const [_, replyTo, message, messageId] = data.split(':', 4);
+                displayMessage(message, 'receiver', replyTo, messageId);
+                conn.send(`delivered:${messageId}`);
+            } else if (data.startsWith('delivered:')) {
+                const messageId = data.split(':')[1];
+                updateMessageStatus(messageId, 'delivered');
+            } else if (data.startsWith('seen:')) {
+                const messageId = data.split(':')[1];
+                updateMessageStatus(messageId, 'seen');
             } else {
-                displayMessage(data, 'receiver');
+                const messageId = data.split(':')[0];
+                const message = data.split(':').slice(1).join(':');
+                displayMessage(message, 'receiver', null, messageId);
+                conn.send(`delivered:${messageId}`);
             }
         }
     });
@@ -222,13 +235,55 @@ function setupConnection() {
         status.classList.remove('connected');
         status.classList.add('disconnected');
     });
+
+    // Mark messages as seen when they come into view
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const messageId = entry.target.dataset.messageId;
+                if (messageId && messageStatuses.get(messageId) === 'delivered') {
+                    conn.send(`seen:${messageId}`);
+                    updateMessageStatus(messageId, 'seen');
+                }
+            }
+        });
+    }, { root: chatBox, threshold: 0.5 });
+
+    chatBox.addEventListener('scroll', () => {
+        const messages = chatBox.querySelectorAll('.message.receiver');
+        messages.forEach(message => {
+            observer.observe(message);
+        });
+    });
+}
+
+// Generate a unique message ID
+function generateMessageId() {
+    return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+}
+
+// Update message status
+function updateMessageStatus(messageId, status) {
+    const messageDiv = chatBox.querySelector(`[data-message-id="${messageId}"]`);
+    if (messageDiv) {
+        const statusTicks = messageDiv.querySelector('.status-ticks');
+        if (statusTicks) {
+            statusTicks.className = `status-ticks ${status}`;
+        }
+        messageStatuses.set(messageId, status);
+    }
 }
 
 // Display incoming or outgoing text messages
-function displayMessage(text, type, replyTo = null) {
+function displayMessage(text, type, replyTo = null, messageId = null) {
+    if (!messageId) {
+        messageId = generateMessageId();
+    }
+
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
-    messageDiv.dataset.message = text; // Store message for reply
+    messageDiv.dataset.message = text;
+    messageDiv.dataset.messageId = messageId;
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('name');
@@ -246,6 +301,13 @@ function displayMessage(text, type, replyTo = null) {
     contentSpan.classList.add('content');
     contentSpan.textContent = text;
     messageDiv.appendChild(contentSpan);
+
+    if (type === 'sender') {
+        const statusTicks = document.createElement('span');
+        statusTicks.classList.add('status-ticks', 'sent');
+        contentSpan.appendChild(statusTicks);
+        messageStatuses.set(messageId, 'sent');
+    }
 
     chatBox.appendChild(messageDiv);
     scrollToBottom();
@@ -277,9 +339,14 @@ function hideTypingIndicator() {
 }
 
 // Display media from Base64 data
-function displayMedia(mediaType, base64Data, fileName, type) {
+function displayMedia(mediaType, base64Data, fileName, type, messageId = null) {
+    if (!messageId) {
+        messageId = generateMessageId();
+    }
+
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', type);
+    messageDiv.dataset.messageId = messageId;
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('name');
@@ -337,6 +404,13 @@ function displayMedia(mediaType, base64Data, fileName, type) {
         downloadLink.style.textDecoration = 'none';
         downloadLink.style.fontSize = '1.2em';
         container.appendChild(downloadLink);
+    }
+
+    if (type === 'sender') {
+        const statusTicks = document.createElement('span');
+        statusTicks.classList.add('status-ticks', 'sent');
+        container.appendChild(statusTicks);
+        messageStatuses.set(messageId, 'sent');
     }
 
     messageDiv.appendChild(container);
@@ -431,6 +505,7 @@ async function sendMessage() {
 
     const text = messageInput.value.trim();
     const file = fileInput.files[0];
+    const messageId = generateMessageId();
 
     // Clear typing indicator when sending a message
     sendTypingEvent(false);
@@ -438,21 +513,21 @@ async function sendMessage() {
     if (text) {
         if (replyingToMessage) {
             const replyTo = replyingToMessage.dataset.message;
-            conn.send(`reply:${replyTo}:${text}`);
-            displayMessage(text, 'sender', replyTo);
+            conn.send(`reply:${replyTo}:${text}:${messageId}`);
+            displayMessage(text, 'sender', replyTo, messageId);
             replyingToMessage = null;
         } else {
-            conn.send(text);
-            displayMessage(text, 'sender');
+            conn.send(`${messageId}:${text}`);
+            displayMessage(text, 'sender', null, messageId);
         }
         messageInput.value = '';
     }
     if (file) {
         try {
             const base64Data = await fileToBase64(file);
-            const message = `media:${file.type}:${base64Data}:${file.name}`;
+            const message = `media:${file.type}:${base64Data}:${file.name}:${messageId}`;
             conn.send(message);
-            displayMedia(file.type, base64Data, file.name, 'sender');
+            displayMedia(file.type, base64Data, file.name, 'sender', messageId);
         } catch (err) {
             console.error("Failed to encode file to Base64:", err);
             alert("Failed to encode and send media.");
@@ -515,6 +590,7 @@ function addSwipeAndLongPress(messageDiv) {
         const diffX = currentX - startX;
         if (diffX > 50) {
             showReplyOverlay(messageDiv);
+            initiateReply(); // Auto-enable reply on swipe
         }
         messageDiv.style.transform = 'translateX(0)';
         isSwiping = false;
@@ -529,12 +605,17 @@ function addSwipeAndLongPress(messageDiv) {
 function showReplyOverlay(messageDiv) {
     replyingToMessage = messageDiv;
     const rect = messageDiv.getBoundingClientRect();
-    replyOverlay.style.display = 'block';
+    replyOverlay.style.display = 'flex';
     replyOverlay.style.top = `${rect.top + window.scrollY}px`;
-    replyOverlay.style.left = `${rect.left + rect.width - 60}px`;
+    replyOverlay.style.left = `${rect.left + rect.width - 80}px`;
 }
 
 function initiateReply() {
     replyOverlay.style.display = 'none';
     messageInput.focus();
+}
+
+function cancelReply() {
+    replyingToMessage = null;
+    replyOverlay.style.display = 'none';
 }
