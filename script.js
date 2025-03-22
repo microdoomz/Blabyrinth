@@ -227,6 +227,7 @@ function displayMessage(text, type) {
     messageDiv.appendChild(nameSpan);
 
     const contentSpan = document.createElement('span');
+    contentSpan.classList.add('content');
     contentSpan.textContent = text;
     messageDiv.appendChild(contentSpan);
 
@@ -283,7 +284,7 @@ function displayMedia(mediaType, base64Data, fileName, type) {
         fileLink.href = `data:${mediaType};base64,${base64Data}`;
         fileLink.textContent = fileName || 'Download File';
         fileLink.download = fileName || 'file';
-        fileLink.style.color = '#2c3e50';
+        fileLink.style.color = '#a30000';
         fileLink.style.textDecoration = 'underline';
         messageDiv.appendChild(fileLink);
     }
