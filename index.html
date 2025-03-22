@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple P2P Chat</title>
+    <title>Blabyrinth</title>
     <link rel="stylesheet" href="style.css">
     <!-- Include PeerJS from CDN -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <div id="status" class="status"></div>
-        <h1>Simple P2P Chat</h1>
+        <h1>Blabyrinth</h1>
         <p class="label">Set your connection code:</p>
         <input type="text" id="my-code-input" placeholder="Your custom code">
         <button onclick="setMyCode()">Set Code</button>
@@ -19,10 +19,22 @@
         <p class="label">Enter your friend's code to connect:</p>
         <input type="text" id="friend-code" placeholder="Friend's connection code">
         <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
+        <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
         <div id="chat-box"></div>
-        <input type="text" id="message-input" placeholder="Type a message...">
-        <input type="file" id="file-input" accept="image/*,video/*">
-        <button onclick="sendMessage()">Send</button>
+        <div class="input-container">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <label for="file-input" class="file-label">Choose File</label>
+            <input type="file" id="file-input" accept="*">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+    <!-- Full-screen overlay for media -->
+    <div id="media-overlay" class="media-overlay">
+        <div class="media-overlay-content">
+            <button class="close-btn" onclick="closeMediaOverlay()">×</button>
+            <div id="media-overlay-content"></div>
+            <a id="download-btn" class="download-btn" download>Download</a>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>
