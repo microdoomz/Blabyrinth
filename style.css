@@ -76,13 +76,6 @@ h1 {
     align-items: center;
 }
 
-.login-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-}
-
 .chat-header {
     display: flex;
     justify-content: space-between;
@@ -305,7 +298,7 @@ h1 {
     cursor: pointer;
 }
 
-#message-input, #friend-code, #my-code-input, #username-input, #password-input {
+#message-input, #friend-code, #my-code-input {
     width: calc(100% - 20px);
     padding: 8px;
     margin: 3px 0;
@@ -317,7 +310,7 @@ h1 {
     transition: border-color 0.3s ease;
 }
 
-#message-input:focus, #friend-code:focus, #my-code-input:focus, #username-input:focus, #password-input:focus {
+#message-input:focus, #friend-code:focus, #my-code-input:focus {
     border-color: #a30000;
     outline: none;
 }
