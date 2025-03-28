@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Blabyrinth - Chat</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="themes.css">
     <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -13,9 +14,9 @@
             <h1>Blabyrinth</h1>
             <div class="menu">
                 <button class="menu-btn">⋮</button>
-                <div class="menu-content">
-                    <a href="index.html" onclick="terminateConnection()">Home</a>
-                    <a href="#" onclick="openThemeModal()">Change Theme</a>
+                <div class="menu-dropdown">
+                    <button onclick="goToHome()">Home</button>
+                    <button onclick="openThemeSelector()">Change Theme</button>
                 </div>
             </div>
         </div>
@@ -28,30 +29,35 @@
             <button id="cancel-reply-btn" onclick="cancelReply()" class="cancel-reply">×</button>
         </div>
         <div class="input-container">
+            <button class="location-btn" onclick="shareLocation()">📍</button>
+            <button class="gif-btn" onclick="openGifPicker()">🎞️</button>
             <input type="text" id="message-input" placeholder="Type a message...">
-            <button onclick="shareLocation()" class="location-btn">📍</button>
             <label for="file-input" class="file-label">📎</label>
             <input type="file" id="file-input" accept="*">
             <div id="file-preview" class="file-preview"></div>
             <button onclick="sendMessage()" class="send-btn">➤</button>
         </div>
-    </div>
-    <div id="media-overlay" class="media-overlay">
-        <div class="media-overlay-content">
-            <button class="close-btn" onclick="closeMediaOverlay()">×</button>
-            <div id="media-overlay-content"></div>
-            <a id="download-btn" class="download-btn" download>Download</a>
+        <div id="gif-picker" class="gif-picker">
+            <div class="gif-picker-content">
+                <button class="close-btn" onclick="closeGifPicker()">×</button>
+                <div id="gif-list" class="gif-list"></div>
+            </div>
         </div>
-    </div>
-    <div id="theme-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal" onclick="closeThemeModal()">&times;</span>
-            <h2>Select Theme</h2>
-            <div id="theme-list"></div>
+        <div id="theme-selector" class="theme-selector">
+            <div class="theme-selector-content">
+                <button class="close-btn" onclick="closeThemeSelector()">×</button>
+                <div id="theme-list" class="theme-list"></div>
+            </div>
+        </div>
+        <div id="media-overlay" class="media-overlay">
+            <div class="media-overlay-content">
+                <button class="close-btn" onclick="closeMediaOverlay()">×</button>
+                <div id="media-overlay-content"></div>
+                <a id="download-btn" class="download-btn" download>Download</a>
+            </div>
         </div>
     </div>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="themes.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
