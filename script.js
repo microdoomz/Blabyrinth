@@ -32,12 +32,6 @@ const peerJsServers = [
 ];
 let currentServerIndex = 0;
 
-const users = {
-    'junaid': 'password123',
-    'doom': 'password456',
-    'user3': 'password789'
-};
-
 const themes = [
     { name: 'Default (Gothic)', class: 'theme-default' },
     { name: 'Midnight Blue', class: 'theme-midnight-blue' },
@@ -115,21 +109,19 @@ function initializeChatPage() {
     populateThemeSelector();
     populateGifPicker();
 
-    document.querySelector('.menu-btn').addEventListener('click', () => {
-        document.querySelector('.menu-dropdown').classList.toggle('active');
+    // Fix the three-dot menu toggle
+    const menuBtn = document.querySelector('.menu-btn');
+    const menuDropdown = document.querySelector('.menu-dropdown');
+    menuBtn.addEventListener('click', () => {
+        menuDropdown.classList.toggle('active');
     });
-}
 
-function login() {
-    const username = document.getElementById('username-input').value.trim();
-    const password = document.getElementById('password-input').value.trim();
-    if (users[username] && users[username] === password) {
-        localStorage.setItem('loggedInUser', username);
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('connection-section').style.display = 'block';
-    } else {
-        alert('Invalid username or password!');
-    }
+    // Ensure clicking outside the menu closes it
+    document.addEventListener('click', (e) => {
+        if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
+            menuDropdown.classList.remove('active');
+        }
+    });
 }
 
 function resetConnection() {
@@ -1020,6 +1012,7 @@ function applyTheme() {
 
 function populateThemeSelector() {
     const themeList = document.getElementById('theme-list');
+    themeList.innerHTML = ''; // Clear any existing content
     themes.forEach(theme => {
         const themeOption = document.createElement('div');
         themeOption.classList.add('theme-option');
@@ -1038,7 +1031,10 @@ function populateThemeSelector() {
 }
 
 function openThemeSelector() {
-    document.getElementById('theme-selector').classList.add('active');
+    const themeSelector = document.getElementById('theme-selector');
+    themeSelector.classList.add('active');
+    // Ensure the menu closes after opening the theme selector
+    document.querySelector('.menu-dropdown').classList.remove('active');
 }
 
 function closeThemeSelector() {
