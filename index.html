@@ -10,26 +10,34 @@
 <body>
     <div class="container">
         <h1>Blabyrinth</h1>
-        <div id="status" class="status"></div>
-        <div class="code-inputs">
-            <div class="code-input">
-                <p class="label">Set your connection code:</p>
-                <input type="text" id="my-code-input" placeholder="Your custom code" onkeypress="if(event.key === 'Enter') setMyCode()">
-                <button onclick="setMyCode()">Set Code</button>
-            </div>
-            <div class="code-input">
-                <p class="label">Enter your friend's code to connect:</p>
-                <input type="text" id="friend-code" placeholder="Friend's connection code" onkeypress="if(event.key === 'Enter') connectToFriend()">
-                <div class="button-group">
-                    <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
-                    <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+        <div id="login-section" class="login-section">
+            <p class="label">Login to Continue</p>
+            <input type="text" id="username-input" placeholder="Username">
+            <input type="password" id="password-input" placeholder="Password">
+            <button onclick="login()">Login</button>
+        </div>
+        <div id="connection-section" class="connection-section" style="display: none;">
+            <div id="status" class="status"></div>
+            <div class="code-inputs">
+                <div class="code-input">
+                    <p class="label">Set your connection code:</p>
+                    <input type="text" id="my-code-input" placeholder="Your custom code" onkeypress="if(event.key === 'Enter') setMyCode()">
+                    <button onclick="setMyCode()">Set Code</button>
+                </div>
+                <div class="code-input">
+                    <p class="label">Enter your friend's code to connect:</p>
+                    <input type="text" id="friend-code" placeholder="Friend's connection code" onkeypress="if(event.key === 'Enter') connectToFriend()">
+                    <div class="button-group">
+                        <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
+                        <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+                    </div>
                 </div>
             </div>
-        </div>
-        <p class="label">Your connection code: <span id="my-code"></span></p>
-        <div id="recent-connections">
-            <h2>Recent Connections</h2>
-            <ul id="recent-connections-list"></ul>
+            <p class="label">Your connection code: <span id="my-code"></span></p>
+            <div id="chat-list" class="chat-list">
+                <h2>Recent Chats</h2>
+                <!-- Chat list will be populated dynamically -->
+            </div>
         </div>
     </div>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
