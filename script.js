@@ -6,25 +6,24 @@ let typingTimeout;
 let typingMessageElement = null;
 let replyingToMessage = null;
 let messageStatuses = new Map();
-let chatBox;
-let messageInput;
-let fileInput;
-let filePreview;
-let status;
-let myCodeDisplay;
-let myCodeInput;
-let friendCodeInput;
-let connectBtn;
-let disconnectBtn;
-let mediaOverlay;
-let mediaOverlayContent;
-let downloadBtn;
-let replyPreviewArea;
-let replyPreview;
-let resizeHandle;
-let chatHistory = {};
-let recentChats = JSON.parse(localStorage.getItem('recentChats')) || [];
+const chatBox = document.getElementById('chat-box');
+const messageInput = document.getElementById('message-input');
+const fileInput = document.getElementById('file-input');
+const filePreview = document.getElementById('file-preview');
+const status = document.getElementById('status');
+const myCodeDisplay = document.getElementById('my-code');
+const myCodeInput = document.getElementById('my-code-input');
+const friendCodeInput = document.getElementById('friend-code');
+const connectBtn = document.getElementById('connect-btn');
+const disconnectBtn = document.getElementById('disconnect-btn');
+const mediaOverlay = document.getElementById('media-overlay');
+const mediaOverlayContent = document.getElementById('media-overlay-content');
+const downloadBtn = document.getElementById('download-btn');
+const replyPreviewArea = document.getElementById('reply-preview-area');
+const replyPreview = document.getElementById('reply-preview');
+const resizeHandle = document.getElementById('chat-box-resize-handle');
 
+// List of PeerJS servers for fallback
 const peerJsServers = [
     { host: '0.peerjs.com', port: 443, path: '/' },
     { host: 'peerjs.herokuapp.com', port: 443, path: '/' },
@@ -32,46 +31,10 @@ const peerJsServers = [
 ];
 let currentServerIndex = 0;
 
-const themes = [
-    { name: 'Default (Gothic)', class: 'theme-default' },
-    { name: 'Midnight Blue', class: 'theme-midnight-blue' },
-    { name: 'Forest Green', class: 'theme-forest-green' },
-    { name: 'Sunset Orange', class: 'theme-sunset-orange' },
-    { name: 'Lavender Dream', class: 'theme-lavender-dream' },
-    { name: 'Ocean Breeze', class: 'theme-ocean-breeze' },
-    { name: 'Cosmic Purple', class: 'theme-cosmic-purple' },
-    { name: 'Warm Sand', class: 'theme-warm-sand' },
-    { name: 'Neon Glow', class: 'theme-neon-glow' },
-    { name: 'Cherry Blossom', class: 'theme-cherry-blossom' },
-    { name: 'Arctic Frost', class: 'theme-arctic-frost' }
-];
-
-const gifs = [
-    'gifs/happy.gif',
-    'gifs/laughing.gif',
-    'gifs/sad.gif',
-    'gifs/angry.gif',
-    'gifs/love.gif'
-];
-
-// Initialize based on the current page
+// Load saved connection details from localStorage
 window.onload = () => {
-    if (window.location.pathname.includes('chat.html')) {
-        initializeChatPage();
-    } else {
-        initializeHomePage();
-    }
-};
-
-function initializeHomePage() {
-    status = document.getElementById('status');
-    myCodeDisplay = document.getElementById('my-code');
-    myCodeInput = document.getElementById('my-code-input');
-    friendCodeInput = document.getElementById('friend-code');
-    connectBtn = document.getElementById('connect-btn');
-    disconnectBtn = document.getElementById('disconnect-btn');
-
     const savedMyCode = localStorage.getItem('myConnectionCode');
+    const savedFriendCode = localStorage.getItem('friendCode');
     if (savedMyCode) {
         myCodeInput.value = savedMyCode;
         myCodeInput.disabled = true;
@@ -79,51 +42,20 @@ function initializeHomePage() {
         myConnectionCode = savedMyCode;
         connectToNextPeerJsServer();
     }
-
-    displayRecentChats();
-}
-
-function initializeChatPage() {
-    chatBox = document.getElementById('chat-box');
-    messageInput = document.getElementById('message-input');
-    fileInput = document.getElementById('file-input');
-    filePreview = document.getElementById('file-preview');
-    mediaOverlay = document.getElementById('media-overlay');
-    mediaOverlayContent = document.getElementById('media-overlay-content');
-    downloadBtn = document.getElementById('download-btn');
-    replyPreviewArea = document.getElementById('reply-preview-area');
-    replyPreview = document.getElementById('reply-preview');
-    resizeHandle = document.getElementById('chat-box-resize-handle');
-
-    myConnectionCode = localStorage.getItem('myConnectionCode');
-    friendCode = localStorage.getItem('friendCode');
-    if (!myConnectionCode || !friendCode) {
-        window.location.href = 'index.html';
-        return;
-    }
-
-    loadChatHistory();
-    setupConnection();
-    initChatBoxResize();
-    applyTheme();
-    populateThemeSelector();
-    populateGifPicker();
-
-    // Fix the three-dot menu toggle
-    const menuBtn = document.querySelector('.menu-btn');
-    const menuDropdown = document.querySelector('.menu-dropdown');
-    menuBtn.addEventListener('click', () => {
-        menuDropdown.classList.toggle('active');
-    });
-
-    // Ensure clicking outside the menu closes it
-    document.addEventListener('click', (e) => {
-        if (!menuBtn.contains(e.target) && !menuDropdown.contains(e.target)) {
-            menuDropdown.classList.remove('active');
+    if (savedFriendCode) {
+        friendCodeInput.value = savedFriendCode;
+        friendCode = savedFriendCode;
+        if (myConnectionCode) {
+            connectToFriend();
         }
-    });
-}
+    }
+    // Ensure reply preview area is hidden on load
+    replyPreviewArea.classList.remove('active');
+    // Initialize chat box resizing
+    initChatBoxResize();
+};
 
+// Reset connection state
 function resetConnection() {
     if (peer) {
         peer.destroy();
@@ -154,6 +86,7 @@ function resetConnection() {
     replyPreviewArea.classList.remove('active');
 }
 
+// Set your custom connection code and initialize PeerJS with fallback
 function setMyCode() {
     myConnectionCode = myCodeInput.value.trim();
     if (!myConnectionCode) {
@@ -166,6 +99,7 @@ function setMyCode() {
     connectToNextPeerJsServer();
 }
 
+// Connect to a PeerJS server with fallback mechanism
 function connectToNextPeerJsServer() {
     if (currentServerIndex >= peerJsServers.length) {
         resetConnection();
@@ -207,18 +141,16 @@ function connectToNextPeerJsServer() {
         connectToNextPeerJsServer();
     });
 
+    // Handle incoming connections
     peer.on('connection', (connection) => {
         conn = connection;
         friendCode = conn.peer;
         localStorage.setItem('friendCode', friendCode);
-        if (!recentChats.includes(friendCode)) {
-            recentChats.push(friendCode);
-            localStorage.setItem('recentChats', JSON.stringify(recentChats));
-        }
-        window.location.href = 'chat.html';
+        setupConnection();
     });
 }
 
+// Connect to your friend's ID with retry logic
 function connectToFriend() {
     if (!myConnectionCode) {
         alert("Please set your connection code first!");
@@ -237,6 +169,7 @@ function connectToFriend() {
     attemptConnection(friendCode, 3, 2000);
 }
 
+// Retry connection with delay
 function attemptConnection(friendCode, retries, delay) {
     if (retries <= 0) {
         status.textContent = "Failed to connect to " + friendCode + ". Please ensure they are online and try again.";
@@ -247,11 +180,7 @@ function attemptConnection(friendCode, retries, delay) {
 
     conn = peer.connect(friendCode);
     conn.on('open', () => {
-        if (!recentChats.includes(friendCode)) {
-            recentChats.push(friendCode);
-            localStorage.setItem('recentChats', JSON.stringify(recentChats));
-        }
-        window.location.href = 'chat.html';
+        setupConnection();
     });
 
     conn.on('error', (err) => {
@@ -264,7 +193,11 @@ function attemptConnection(friendCode, retries, delay) {
     });
 }
 
+// Set up the connection for sending/receiving messages
 function setupConnection() {
+    status.textContent = "Connected! Start chatting.";
+    status.classList.remove('disconnected');
+    status.classList.add('connected');
     conn.on('data', (data) => {
         if (typeof data === 'string') {
             if (data.startsWith('typing:')) {
@@ -298,13 +231,19 @@ function setupConnection() {
     });
 
     conn.on('close', () => {
-        window.location.href = 'index.html';
+        status.textContent = "Connection closed.";
+        status.classList.remove('connected');
+        status.classList.add('disconnected');
+        conn = null;
     });
 
     conn.on('error', (err) => {
-        window.location.href = 'index.html';
+        status.textContent = "Connection error: " + err;
+        status.classList.remove('connected');
+        status.classList.add('disconnected');
     });
 
+    // Mark messages as seen when they come into view
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -318,6 +257,7 @@ function setupConnection() {
         });
     }, { root: chatBox, threshold: 0.5 });
 
+    // Observe existing messages and new ones
     const observeMessages = () => {
         const messages = chatBox.querySelectorAll('.message.receiver');
         messages.forEach(message => {
@@ -328,19 +268,25 @@ function setupConnection() {
         });
     };
 
+    // Initial observation
     observeMessages();
+
+    // Observe on scroll and new messages
     chatBox.addEventListener('scroll', observeMessages);
     const mutationObserver = new MutationObserver(observeMessages);
     mutationObserver.observe(chatBox, { childList: true });
 }
 
+// Generate a unique message ID
 function generateMessageId() {
     return Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 }
 
+// Convert timestamp to IST and format like WhatsApp
 function formatTimestamp(timestamp) {
     const date = new Date(timestamp);
-    const istOffset = 5.5 * 60;
+    // Get the UTC time and adjust for IST (UTC +5:30)
+    const istOffset = 5.5 * 60; // 5 hours 30 minutes in minutes
     const utcMinutes = date.getUTCHours() * 60 + date.getUTCMinutes();
     const istMinutes = (utcMinutes + istOffset) % (24 * 60);
     const istHours = Math.floor(istMinutes / 60);
@@ -350,6 +296,7 @@ function formatTimestamp(timestamp) {
     return `${hours}:${minutes} ${ampm}`;
 }
 
+// Update message status
 function updateMessageStatus(messageId, status) {
     const messageDiv = chatBox.querySelector(`[data-message-id="${messageId}"]`);
     if (messageDiv) {
@@ -361,6 +308,7 @@ function updateMessageStatus(messageId, status) {
     }
 }
 
+// Display incoming or outgoing text messages
 function displayMessage(text, type, replyTo = null, messageId = null, timestamp = null, replyToId = null, replyToMediaType = '', replyToMediaSrc = '') {
     if (!messageId) {
         messageId = generateMessageId();
@@ -400,7 +348,6 @@ function displayMessage(text, type, replyTo = null, messageId = null, timestamp 
                 const originalMessage = chatBox.querySelector(`[data-message-id="${replyToId}"]`);
                 if (originalMessage) {
                     originalMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    originalMessage.classList.add('highlight');
                 }
             });
         }
@@ -429,11 +376,10 @@ function displayMessage(text, type, replyTo = null, messageId = null, timestamp 
     chatBox.appendChild(messageDiv);
     scrollToBottom();
     addSwipeAndLongPress(messageDiv);
-
-    saveMessage({ text, type, replyTo, messageId, timestamp, replyToId, replyToMediaType, replyToMediaSrc });
     return messageId;
 }
 
+// Show typing indicator inside chat box
 function showTypingIndicator() {
     if (typingMessageElement) return;
 
@@ -448,6 +394,7 @@ function showTypingIndicator() {
     scrollToBottom();
 }
 
+// Hide typing indicator
 function hideTypingIndicator() {
     if (typingMessageElement) {
         typingMessageElement.remove();
@@ -456,6 +403,7 @@ function hideTypingIndicator() {
     scrollToBottom();
 }
 
+// Display media from Base64 data
 function displayMedia(mediaType, base64Data, fileName, type, messageId = null, timestamp = null) {
     if (!messageId) {
         messageId = generateMessageId();
@@ -545,11 +493,10 @@ function displayMedia(mediaType, base64Data, fileName, type, messageId = null, t
     chatBox.appendChild(messageDiv);
     scrollToBottom();
     addSwipeAndLongPress(messageDiv);
-
-    saveMessage({ mediaType, base64Data, fileName, type, messageId, timestamp });
     return messageId;
 }
 
+// Open media in full-screen overlay
 function openMediaOverlay(src, fileName) {
     mediaOverlayContent.innerHTML = '';
     if (src.includes('image')) {
@@ -567,47 +514,13 @@ function openMediaOverlay(src, fileName) {
     mediaOverlay.classList.add('active');
 }
 
+// Close media overlay
 function closeMediaOverlay() {
     mediaOverlay.classList.remove('active');
     mediaOverlayContent.innerHTML = '';
 }
 
-function compressImage(file, callback) {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target.result;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const maxWidth = 800;
-            const maxHeight = 800;
-            let width = img.width;
-            let height = img.height;
-
-            if (width > height) {
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-            } else {
-                if (height > maxHeight) {
-                    width = Math.round((width * maxHeight) / height);
-                    height = maxHeight;
-                }
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(img, 0, 0, width, height);
-            canvas.toBlob((blob) => {
-                callback(blob);
-            }, 'image/jpeg', 0.7);
-        };
-    };
-}
-
+// Convert file to Base64 and send
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -620,6 +533,7 @@ function fileToBase64(file) {
     });
 }
 
+// Show file preview
 fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
     if (file) {
@@ -638,19 +552,17 @@ fileInput.addEventListener('change', () => {
             fileName.textContent = file.name;
             filePreview.appendChild(fileName);
         }
-        const progressBar = document.createElement('div');
-        progressBar.classList.add('progress-bar');
-        progressBar.innerHTML = '<div class="progress"></div>';
-        filePreview.appendChild(progressBar);
     } else {
         clearFilePreview();
     }
 });
 
+// Clear file preview
 function clearFilePreview() {
     filePreview.innerHTML = '';
 }
 
+// Scroll to bottom of chat box
 function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
     setTimeout(() => {
@@ -658,11 +570,13 @@ function scrollToBottom() {
     }, 0);
 }
 
+// Send typing event
 function sendTypingEvent(isTyping) {
     if (!conn || !conn.open) return;
     conn.send(`typing:${isTyping}`);
 }
 
+// Send text or file
 async function sendMessage() {
     if (!conn || !conn.open) {
         alert("Not connected yet! Connect to your friend first.");
@@ -674,6 +588,7 @@ async function sendMessage() {
     const messageId = generateMessageId();
     const timestamp = Date.now();
 
+    // Clear typing indicator when sending a message
     sendTypingEvent(false);
 
     if (text) {
@@ -694,135 +609,132 @@ async function sendMessage() {
     }
     if (file) {
         try {
-            let fileToSend = file;
-            if (file.type.startsWith('image')) {
-                fileToSend = await new Promise((resolve) => {
-                    compressImage(file, (compressedFile) => resolve(compressedFile));
-                });
-            }
-            const base64Data = await fileToBase64(fileToSend);
-            const chunkSize = 16 * 1024;
-            const totalChunks = Math.ceil(base64Data.length / chunkSize);
-            let chunksSent = 0;
-
-            const progressBar = filePreview.querySelector('.progress');
-            for (let i = 0; i < base64Data.length; i += chunkSize) {
-                const chunk = base64Data.slice(i, i + chunkSize);
-                conn.send(`media:${fileToSend.type}:${chunk}:${fileToSend.name}:${messageId}:${timestamp}`);
-                chunksSent++;
-                const progress = (chunksSent / totalChunks) * 100;
-                progressBar.style.width = `${progress}%`;
-            }
-            displayMedia(fileToSend.type, base64Data, fileToSend.name, 'sender', messageId, timestamp);
-            fileInput.value = '';
-            clearFilePreview();
-        } catch (error) {
-            console.error('Error sending file:', error);
-            alert('Failed to send file. Please try again.');
-            clearFilePreview();
+            const base64Data = await fileToBase64(file);
+            const message = `media:${file.type}:${base64Data}:${file.name}:${messageId}:${timestamp}`;
+            conn.send(message);
+            displayMedia(file.type, base64Data, file.name, 'sender', messageId, timestamp);
+        } catch (err) {
+            console.error("Failed to encode file to Base64:", err);
+            alert("Failed to encode and send media.");
         }
+        fileInput.value = '';
+        clearFilePreview();
     }
 }
 
-function shareLocation() {
-    if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser.');
-        return;
+// Disconnect manually
+function disconnect() {
+    resetConnection();
+}
+
+// Add typing event listener
+messageInput.addEventListener('input', () => {
+    if (!conn || !conn.open) return;
+
+    // Send typing event when user starts typing
+    sendTypingEvent(true);
+
+    // Clear typing event after 2 seconds of inactivity
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        sendTypingEvent(false);
+    }, 2000);
+});
+
+// Send message on Enter key
+messageInput.addEventListener('keypress', (event) => {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        sendMessage();
     }
+});
 
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const { latitude, longitude } = position.coords;
-            const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-            const message = `My location: ${locationUrl}`;
-            const messageId = generateMessageId();
-            const timestamp = Date.now();
-            conn.send(`${messageId}:${timestamp}:${message}`);
-            displayMessage(message, 'sender', null, messageId, timestamp);
-        },
-        (error) => {
-            console.error('Error getting location:', error);
-            alert('Unable to get your location. Please allow location access and try again.');
+// Swipe and long-press for reply
+function addSwipeAndLongPress(messageDiv) {
+    let startX = 0;
+    let isSwiping = false;
+
+    messageDiv.addEventListener('touchstart', (e) => {
+        startX = e.touches[0].clientX;
+        isSwiping = true;
+    });
+
+    messageDiv.addEventListener('touchmove', (e) => {
+        if (!isSwiping) return;
+        const currentX = e.touches[0].clientX;
+        const diffX = currentX - startX;
+        if (diffX > 50) {
+            messageDiv.style.transform = 'translateX(50px)';
+            showReplyPreview(messageDiv);
+            // Automatically open the keyboard
+            messageInput.focus();
+        } else {
+            messageDiv.style.transform = 'translateX(0)';
+            replyPreviewArea.classList.remove('active');
         }
-    );
-}
+    });
 
-function openGifPicker() {
-    document.getElementById('gif-picker').classList.add('active');
-}
+    messageDiv.addEventListener('touchend', (e) => {
+        const currentX = e.changedTouches[0].clientX;
+        const diffX = currentX - startX;
+        if (diffX > 50) {
+            // Keep the preview visible for user to type or cancel
+        } else {
+            replyPreviewArea.classList.remove('active');
+            replyingToMessage = null;
+        }
+        messageDiv.style.transform = 'translateX(0)';
+        isSwiping = false;
+    });
 
-function closeGifPicker() {
-    document.getElementById('gif-picker').classList.remove('active');
-}
-
-function populateGifPicker() {
-    const gifList = document.getElementById('gif-list');
-    gifs.forEach(gif => {
-        const img = document.createElement('img');
-        img.src = gif;
-        img.onclick = () => {
-            sendGif(gif);
-            closeGifPicker();
-        };
-        gifList.appendChild(img);
+    messageDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showReplyPreview(messageDiv);
+        messageInput.focus();
     });
 }
 
-function sendGif(gifUrl) {
-    fetch(gifUrl)
-        .then(response => response.blob())
-        .then(blob => {
-            const file = new File([blob], 'gif.gif', { type: 'image/gif' });
-            fileInput.files = new DataTransfer().files;
-            const dataTransfer = new DataTransfer();
-            dataTransfer.items.add(file);
-            fileInput.files = dataTransfer.files;
-            sendMessage();
-        })
-        .catch(error => {
-            console.error('Error sending GIF:', error);
-            alert('Failed to send GIF. Please try again.');
-        });
-}
+function showReplyPreview(messageDiv) {
+    replyingToMessage = messageDiv;
+    replyPreviewArea.classList.add('active');
 
-function disconnect() {
-    if (conn) {
-        conn.close();
+    // Show preview (image, video, or text)
+    replyPreview.innerHTML = '';
+    if (messageDiv.dataset.mediaType) {
+        if (messageDiv.dataset.mediaType.startsWith('image')) {
+            const img = document.createElement('img');
+            img.src = messageDiv.dataset.mediaSrc;
+            replyPreview.appendChild(img);
+        } else if (messageDiv.dataset.mediaType.startsWith('video')) {
+            const video = document.createElement('video');
+            video.src = messageDiv.dataset.mediaSrc;
+            video.controls = true;
+            replyPreview.appendChild(video);
+        } else {
+            replyPreview.textContent = messageDiv.dataset.message;
+        }
+    } else {
+        replyPreview.textContent = messageDiv.dataset.message;
     }
-    if (peer) {
-        peer.destroy();
-    }
-    window.location.href = 'index.html';
 }
 
-function goToHome() {
-    disconnect();
+function cancelReply() {
+    replyingToMessage = null;
+    replyPreviewArea.classList.remove('active');
+    messageInput.blur(); // Close the keyboard if open
 }
 
+// Initialize chat box resizing
 function initChatBoxResize() {
     let isResizing = false;
-    let startY;
-    let startHeight;
+    let startY = 0;
+    let startHeight = 0;
 
     resizeHandle.addEventListener('mousedown', (e) => {
         isResizing = true;
         startY = e.clientY;
         startHeight = chatBox.offsetHeight;
-        document.body.style.userSelect = 'none';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isResizing) return;
-        const deltaY = startY - e.clientY;
-        const newHeight = startHeight + deltaY;
-        const minHeight = 200;
-        const maxHeight = window.innerHeight - 220;
-        chatBox.style.height = `${Math.max(minHeight, Math.min(newHeight, maxHeight))}px`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isResizing = false;
-        document.body.style.userSelect = '';
+        document.body.style.userSelect = 'none'; // Prevent text selection while resizing
     });
 
     resizeHandle.addEventListener('touchstart', (e) => {
@@ -832,211 +744,34 @@ function initChatBoxResize() {
         document.body.style.userSelect = 'none';
     });
 
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const deltaY = e.clientY - startY;
+        let newHeight = startHeight + deltaY;
+        // Enforce minimum and maximum heights
+        const minHeight = 200; // Same as CSS min-height
+        const maxHeight = window.innerHeight - 200; // Same as CSS max-height
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        chatBox.style.height = `${newHeight}px`;
+    });
+
     document.addEventListener('touchmove', (e) => {
         if (!isResizing) return;
-        const deltaY = startY - e.touches[0].clientY;
-        const newHeight = startHeight + deltaY;
+        const deltaY = e.touches[0].clientY - startY;
+        let newHeight = startHeight + deltaY;
         const minHeight = 200;
-        const maxHeight = window.innerHeight - 220;
-        chatBox.style.height = `${Math.max(minHeight, Math.min(newHeight, maxHeight))}px`;
+        const maxHeight = window.innerHeight - 220; // Adjust for mobile
+        newHeight = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        chatBox.style.height = `${newHeight}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isResizing = false;
+        document.body.style.userSelect = '';
     });
 
     document.addEventListener('touchend', () => {
         isResizing = false;
         document.body.style.userSelect = '';
     });
-}
-
-function addSwipeAndLongPress(messageDiv) {
-    let startX, startY, startTime;
-
-    messageDiv.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        startTime = Date.now();
-    });
-
-    messageDiv.addEventListener('touchend', (e) => {
-        const endX = e.changedTouches[0].clientX;
-        const endY = e.changedTouches[0].clientY;
-        const endTime = Date.now();
-        const deltaX = endX - startX;
-        const deltaY = endY - startY;
-        const deltaTime = endTime - startTime;
-
-        if (Math.abs(deltaX) < 30 && Math.abs(deltaY) < 30 && deltaTime > 500) {
-            replyingToMessage = messageDiv;
-            replyPreview.innerHTML = '';
-            if (messageDiv.dataset.mediaType && (messageDiv.dataset.mediaType.startsWith('image') || messageDiv.dataset.mediaType.startsWith('video'))) {
-                if (messageDiv.dataset.mediaType.startsWith('image')) {
-                    const img = document.createElement('img');
-                    img.src = messageDiv.dataset.mediaSrc;
-                    replyPreview.appendChild(img);
-                } else if (messageDiv.dataset.mediaType.startsWith('video')) {
-                    const video = document.createElement('video');
-                    video.src = messageDiv.dataset.mediaSrc;
-                    video.controls = true;
-                    replyPreview.appendChild(video);
-                }
-            } else {
-                replyPreview.textContent = messageDiv.dataset.message;
-            }
-            replyPreviewArea.classList.add('active');
-        } else if (Math.abs(deltaX) > 50 && Math.abs(deltaY) < 50) {
-            if (deltaX > 0) {
-                navigator.clipboard.writeText(messageDiv.dataset.message).then(() => {
-                    alert('Message copied to clipboard!');
-                });
-            }
-        }
-    });
-
-    messageDiv.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        replyingToMessage = messageDiv;
-        replyPreview.innerHTML = '';
-        if (messageDiv.dataset.mediaType && (messageDiv.dataset.mediaType.startsWith('image') || messageDiv.dataset.mediaType.startsWith('video'))) {
-            if (messageDiv.dataset.mediaType.startsWith('image')) {
-                const img = document.createElement('img');
-                img.src = messageDiv.dataset.mediaSrc;
-                replyPreview.appendChild(img);
-            } else if (messageDiv.dataset.mediaType.startsWith('video')) {
-                const video = document.createElement('video');
-                video.src = messageDiv.dataset.mediaSrc;
-                video.controls = true;
-                replyPreview.appendChild(video);
-            }
-        } else {
-            replyPreview.textContent = messageDiv.dataset.message;
-        }
-        replyPreviewArea.classList.add('active');
-    });
-}
-
-function cancelReply() {
-    replyingToMessage = null;
-    replyPreviewArea.classList.remove('active');
-}
-
-messageInput.addEventListener('input', () => {
-    if (!conn || !conn.open) return;
-    sendTypingEvent(true);
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        sendTypingEvent(false);
-    }, 1000);
-});
-
-function saveMessage(message) {
-    const chatKey = `${myConnectionCode}-${friendCode}`;
-    if (!chatHistory[chatKey]) {
-        chatHistory[chatKey] = [];
-    }
-    chatHistory[chatKey].push(message);
-    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-}
-
-function loadChatHistory() {
-    chatHistory = JSON.parse(localStorage.getItem('chatHistory')) || {};
-    const chatKey = `${myConnectionCode}-${friendCode}`;
-    if (chatHistory[chatKey]) {
-        chatHistory[chatKey].forEach(message => {
-            if (message.text) {
-                displayMessage(
-                    message.text,
-                    message.type,
-                    message.replyTo,
-                    message.messageId,
-                    message.timestamp,
-                    message.replyToId,
-                    message.replyToMediaType,
-                    message.replyToMediaSrc
-                );
-            } else if (message.mediaType) {
-                displayMedia(
-                    message.mediaType,
-                    message.base64Data,
-                    message.fileName,
-                    message.type,
-                    message.messageId,
-                    message.timestamp
-                );
-            }
-        });
-    }
-}
-
-function displayRecentChats() {
-    const chatList = document.getElementById('chat-list');
-    recentChats.forEach(code => {
-        const chatItem = document.createElement('div');
-        chatItem.classList.add('chat-list-item');
-        chatItem.innerHTML = `
-            <span class="code">${code}</span>
-            <span class="status">Checking...</span>
-        `;
-        chatList.appendChild(chatItem);
-
-        const tempPeer = new Peer(myConnectionCode + '-temp', {
-            host: peerJsServers[0].host,
-            port: peerJsServers[0].port,
-            path: peerJsServers[0].path
-        });
-
-        tempPeer.on('open', () => {
-            const tempConn = tempPeer.connect(code);
-            tempConn.on('open', () => {
-                chatItem.querySelector('.status').textContent = 'Online';
-                chatItem.querySelector('.status').classList.add('online');
-                tempPeer.destroy();
-            });
-            tempConn.on('error', () => {
-                chatItem.querySelector('.status').textContent = 'Offline';
-                chatItem.querySelector('.status').classList.add('offline');
-                tempPeer.destroy();
-            });
-        });
-
-        chatItem.onclick = () => {
-            friendCodeInput.value = code;
-            connectToFriend();
-        };
-    });
-}
-
-function applyTheme() {
-    const selectedTheme = localStorage.getItem('selectedTheme') || 'theme-default';
-    document.body.className = '';
-    document.body.classList.add(selectedTheme);
-}
-
-function populateThemeSelector() {
-    const themeList = document.getElementById('theme-list');
-    themeList.innerHTML = ''; // Clear any existing content
-    themes.forEach(theme => {
-        const themeOption = document.createElement('div');
-        themeOption.classList.add('theme-option');
-        themeOption.textContent = theme.name;
-        if (localStorage.getItem('selectedTheme') === theme.class) {
-            themeOption.classList.add('active');
-        }
-        themeOption.onclick = () => {
-            localStorage.setItem('selectedTheme', theme.class);
-            applyTheme();
-            document.querySelectorAll('.theme-option').forEach(opt => opt.classList.remove('active'));
-            themeOption.classList.add('active');
-        };
-        themeList.appendChild(themeOption);
-    });
-}
-
-function openThemeSelector() {
-    const themeSelector = document.getElementById('theme-selector');
-    themeSelector.classList.add('active');
-    // Ensure the menu closes after opening the theme selector
-    document.querySelector('.menu-dropdown').classList.remove('active');
-}
-
-function closeThemeSelector() {
-    document.getElementById('theme-selector').classList.remove('active');
 }
