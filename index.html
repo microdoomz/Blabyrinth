@@ -3,38 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Blabyrinth - Home</title>
+    <title>Blabyrinth</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Include PeerJS from CDN -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Include Google Fonts for gothic font -->
     <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
+        <div id="status" class="status"></div>
         <h1>Blabyrinth</h1>
-        <div id="connection-section" class="connection-section">
-            <div id="status" class="status"></div>
-            <div class="code-inputs">
-                <div class="code-input">
-                    <p class="label">Set your connection code:</p>
-                    <input type="text" id="my-code-input" placeholder="Your custom code" onkeypress="if(event.key === 'Enter') setMyCode()">
-                    <button onclick="setMyCode()">Set Code</button>
-                </div>
-                <div class="code-input">
-                    <p class="label">Enter your friend's code to connect:</p>
-                    <input type="text" id="friend-code" placeholder="Friend's connection code" onkeypress="if(event.key === 'Enter') connectToFriend()">
-                    <div class="button-group">
-                        <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
-                        <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
-                    </div>
-                </div>
+        <div class="code-inputs">
+            <div class="code-input">
+                <p class="label">Set your connection code:</p>
+                <input type="text" id="my-code-input" placeholder="Your custom code" onkeypress="if(event.key === 'Enter') setMyCode()">
+                <button onclick="setMyCode()">Set Code</button>
             </div>
-            <p class="label">Your connection code: <span id="my-code"></span></p>
-            <div id="chat-list" class="chat-list">
-                <h2>Recent Chats</h2>
-                <!-- Chat list will be populated dynamically -->
+            <div class="code-input">
+                <p class="label">Enter your friend's code to connect:</p>
+                <input type="text" id="friend-code" placeholder="Friend's connection code" onkeypress="if(event.key === 'Enter') connectToFriend()">
+                <div class="button-group">
+                    <button id="connect-btn" onclick="connectToFriend()" disabled>Connect</button>
+                    <button id="disconnect-btn" onclick="disconnect()" disabled>Disconnect</button>
+                </div>
             </div>
         </div>
+        <p class="label">Your connection code: <span id="my-code"></span></p>
+        <div id="chat-box">
+            <!-- Chat messages will be appended here -->
+        </div>
+        <div id="chat-box-resize-handle" class="resize-handle"></div>
+        <!-- Reply preview area above input -->
+        <div id="reply-preview-area" class="reply-preview-area">
+            <div id="reply-preview" class="reply-preview"></div>
+            <button id="cancel-reply-btn" onclick="cancelReply()" class="cancel-reply">×</button>
+        </div>
+        <div class="input-container">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <label for="file-input" class="file-label">📎</label>
+            <input type="file" id="file-input" accept="*">
+            <div id="file-preview" class="file-preview"></div>
+            <button onclick="sendMessage()" class="send-btn">➤</button>
+        </div>
     </div>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Full-screen overlay for media -->
+    <div id="media-overlay" class="media-overlay">
+        <div class="media-overlay-content">
+            <button class="close-btn" onclick="closeMediaOverlay()">×</button>
+            <div id="media-overlay-content"></div>
+            <a id="download-btn" class="download-btn" download>Download</a>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
